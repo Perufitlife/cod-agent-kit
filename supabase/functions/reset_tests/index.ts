@@ -54,15 +54,15 @@ Deno.serve(async (req) => {
     }
 
     if (resetType === 'all' || resetType === 'orders') {
-      // Delete demo orders
-      const { error: ordersError } = await supabase
+      // Delete ALL test orders (including manual ones for testing)
+      const { error: ordersError, count } = await supabase
         .from('orders')
-        .delete()
+        .delete({ count: 'exact' })
         .eq('tenant_id', tenant_id)
-        .eq('source', 'demo_test');
+        .or('source.eq.demo_test,source.eq.manual,customer_phone_e164.eq.+1234567890');
         
       if (ordersError) throw ordersError;
-      results.orders = 'cleared';
+      results.orders = `cleared ${count || 0} orders`;
     }
 
     if (resetType === 'all' || resetType === 'events') {

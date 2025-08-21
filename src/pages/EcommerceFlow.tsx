@@ -8,8 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { MessageSquare, ShoppingCart, Bot, CheckCircle, AlertTriangle, Clock, Eye } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { MessageSquare, ShoppingCart, Bot, CheckCircle, AlertTriangle, Clock, Eye, RotateCcw, Zap, TrendingUp } from "lucide-react";
 
 const EcommerceFlow = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -17,7 +17,9 @@ const EcommerceFlow = () => {
   const [messageText, setMessageText] = useState("");
   const [conversationId, setConversationId] = useState<string>("");
   const [testResults, setTestResults] = useState<any[]>([]);
+  const [isComparative, setIsComparative] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Realistic e-commerce flow scenarios
   const flowSteps = [
@@ -104,6 +106,47 @@ const EcommerceFlow = () => {
     }
   });
 
+  // Reset test data
+  const resetTestsMut = useMutation({
+    mutationFn: async (resetType: string) => {
+      const response = await supabase.functions.invoke("reset_tests", {
+        body: { resetType }
+      });
+      if (response.error) throw response.error;
+      return response.data;
+    },
+    onSuccess: (data) => {
+      setTestResults([]);
+      setCurrentStep(1);
+      queryClient.invalidateQueries({ queryKey: ["orders-ecommerce"] });
+      toast({
+        title: "✅ Reset completado",
+        description: `${data.results.orders || 'Test data cleared'}`
+      });
+    }
+  });
+
+  // Create demo order
+  const createDemoOrderMut = useMutation({
+    mutationFn: async () => {
+      const response = await supabase.functions.invoke("create_order", {
+        body: { 
+          customer_phone: customerPhone,
+          test_mode: true 
+        }
+      });
+      if (response.error) throw response.error;
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders-ecommerce"] });
+      toast({
+        title: "🛒 Demo order creada",
+        description: "Nueva orden lista para testing"
+      });
+    }
+  });
+
   // Send message mutation
   const sendMessageMut = useMutation({
     mutationFn: async ({ message, conversationId }: { message: string, conversationId: string }) => {
@@ -127,7 +170,8 @@ const EcommerceFlow = () => {
         aiUsed: data.ai_used,
         intent: data.intent,
         confidence: data.confidence,
-        entities: data.entities
+        entities: data.entities,
+        cost: data.ai_used ? 0.00006 : 0 // Approximate OpenAI cost
       };
       
       setTestResults(prev => [...prev, newResult]);
@@ -139,8 +183,8 @@ const EcommerceFlow = () => {
       }
       
       toast({
-        title: "Mensaje enviado",
-        description: `Intent: ${data.intent} (${data.confidence}) ${data.ai_used ? '🤖' : '📋'}`
+        title: isComparative ? "📊 Resultado comparativo" : "✅ Mensaje procesado",
+        description: `${data.intent} (${data.confidence}) ${data.ai_used ? '🤖 OpenAI' : '📋 Reglas'}`
       });
     },
     onError: (error) => {
@@ -205,6 +249,40 @@ const EcommerceFlow = () => {
     }
   };
 
+  const runComparativeTest = async () => {
+    setIsComparative(true);
+    toast({
+      title: "🚀 Iniciando test comparativo", 
+      description: "Ejecutando 5 mensajes con análisis completo"
+    });
+    
+    // Send all test messages sequentially
+    for (let i = 0; i < flowSteps.length; i++) {
+      const step = flowSteps[i];
+      if (step.message) {
+        setCurrentStep(step.step);
+        setMessageText(step.message);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Delay for visibility
+        await sendMessageMut.mutateAsync({ message: step.message, conversationId });
+      }
+    }
+    setIsComparative(false);
+  };
+
+  const calculateMetrics = () => {
+    const aiResults = testResults.filter(r => r.aiUsed);
+    const ruleResults = testResults.filter(r => !r.aiUsed);
+    const totalCost = testResults.reduce((sum, r) => sum + (r.cost || 0), 0);
+    
+    return {
+      totalMessages: testResults.length,
+      aiAccuracy: aiResults.length > 0 ? (aiResults.filter(r => r.confidence >= 0.8).length / aiResults.length * 100).toFixed(1) : 0,
+      rulesAccuracy: ruleResults.length > 0 ? (ruleResults.filter(r => r.confidence >= 0.8).length / ruleResults.length * 100).toFixed(1) : 0,
+      totalCost: totalCost.toFixed(6),
+      entitiesExtracted: testResults.reduce((sum, r) => sum + (Object.keys(r.entities || {}).length), 0)
+    };
+  };
+
   const getStepIcon = (status: string) => {
     switch (status) {
       case "completed": return <CheckCircle className="h-5 w-5 text-green-500" />;
@@ -235,6 +313,26 @@ const EcommerceFlow = () => {
                 <CardDescription>
                   Pasos del proceso e-commerce
                 </CardDescription>
+                <div className="flex gap-2 pt-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => resetTestsMut.mutate('all')}
+                    disabled={resetTestsMut.isPending}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-1" />
+                    Reset
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => createDemoOrderMut.mutate()}
+                    disabled={createDemoOrderMut.isPending}
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-1" />
+                    Demo
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {flowSteps.map((step, index) => (
@@ -271,36 +369,67 @@ const EcommerceFlow = () => {
 
           {/* Main Testing Area */}
           <div className="lg:col-span-2 space-y-6">
-            {/* AI Status */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bot className="h-5 w-5" />
-                  Estado del Sistema
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Modo IA</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant={aiConfig?.ai_mode === "smart" ? "default" : "secondary"}>
-                        {aiConfig?.ai_mode || "loading..."}
-                      </Badge>
-                      {aiConfig?.openai_api_key_encrypted && (
-                        <Badge variant="outline">OpenAI ✓</Badge>
-                      )}
+            {/* AI Status & Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bot className="h-5 w-5" />
+                    Estado IA
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div>
+                      <Label>Modo</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant={aiConfig?.ai_mode === "smart" ? "default" : "secondary"}>
+                          {aiConfig?.ai_mode || "loading..."}
+                        </Badge>
+                        {aiConfig?.openai_api_key_encrypted && (
+                          <Badge variant="outline">OpenAI ✓</Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Órdenes Activas</Label>
+                      <p className="text-2xl font-bold text-primary">
+                        {orders?.length || 0}
+                      </p>
                     </div>
                   </div>
-                  <div>
-                    <Label>Órdenes Activas</Label>
-                    <p className="text-2xl font-bold text-primary">
-                      {orders?.length || 0}
-                    </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Métricas Live
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Mensajes:</span>
+                      <Badge>{calculateMetrics().totalMessages}</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Accuracy IA:</span>
+                      <Badge variant="default">{calculateMetrics().aiAccuracy}%</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Entities:</span>
+                      <Badge variant="outline">{calculateMetrics().entitiesExtracted}</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Cost:</span>
+                      <Badge variant="secondary">${calculateMetrics().totalCost}</Badge>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
 
             {/* Message Testing */}
             <Card>
@@ -342,7 +471,19 @@ const EcommerceFlow = () => {
                     onClick={handleNextStep}
                     disabled={currentStep >= flowSteps.length}
                   >
-                    Siguiente Paso
+                    Siguiente
+                  </Button>
+                </div>
+                
+                <div className="pt-2 border-t">
+                  <Button 
+                    onClick={runComparativeTest}
+                    disabled={sendMessageMut.isPending || !conversationId}
+                    variant="default"
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    🚀 Test Comparativo Completo (5 pasos)
                   </Button>
                 </div>
               </CardContent>
