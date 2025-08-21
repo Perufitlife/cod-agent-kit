@@ -21,6 +21,8 @@ verify_jwt = false
 verify_jwt = false
 [functions.delete_order_complete]
 verify_jwt = false
+[functions.cleanup_all_data]
+verify_jwt = false
 
 [env]
 APP_ENCRYPTION_KEY = "change-this-32bytes-minimo"
