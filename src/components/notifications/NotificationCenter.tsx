@@ -25,12 +25,16 @@ export const NotificationCenter = () => {
   const { toast } = useToast();
 
   useEffect(() => {
+    console.log('🔔 NotificationCenter: Setting up realtime subscriptions...');
+    
     // Subscribe to real-time updates
     const orderSubscription = supabase
       .channel('order-changes')
       .on('postgres_changes', 
         { event: 'INSERT', schema: 'public', table: 'orders' },
         (payload) => {
+          console.log('🚨 NEW ORDER detected:', payload);
+          
           const newNotification: Notification = {
             id: crypto.randomUUID(),
             type: 'order',
@@ -41,6 +45,8 @@ export const NotificationCenter = () => {
             priority: 'high',
             data: payload.new
           };
+          
+          console.log('📩 Adding new order notification:', newNotification);
           setNotifications(prev => [newNotification, ...prev]);
           
           toast({
@@ -52,6 +58,8 @@ export const NotificationCenter = () => {
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'orders' },
         (payload) => {
+          console.log('📝 ORDER UPDATE detected:', payload);
+          
           if (payload.old.status !== payload.new.status) {
             const newNotification: Notification = {
               id: crypto.randomUUID(),
@@ -63,17 +71,23 @@ export const NotificationCenter = () => {
               priority: 'medium',
               data: payload.new
             };
+            
+            console.log('📩 Adding order update notification:', newNotification);
             setNotifications(prev => [newNotification, ...prev]);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Orders subscription status:', status);
+      });
 
     const messageSubscription = supabase
       .channel('message-changes')
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages_inbox' },
         (payload) => {
+          console.log('📨 NEW MESSAGE detected:', payload);
+          
           const newNotification: Notification = {
             id: crypto.randomUUID(),
             type: 'message',
@@ -84,16 +98,22 @@ export const NotificationCenter = () => {
             priority: 'medium',
             data: payload.new
           };
+          
+          console.log('📩 Adding message notification:', newNotification);
           setNotifications(prev => [newNotification, ...prev]);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Messages subscription status:', status);
+      });
 
     const timerSubscription = supabase
       .channel('timer-changes')
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'timers' },
         (payload) => {
+          console.log('⏰ TIMER UPDATE detected:', payload);
+          
           if (payload.new.status === 'fired' && payload.old.status === 'scheduled') {
             const newNotification: Notification = {
               id: crypto.randomUUID(),
@@ -105,11 +125,15 @@ export const NotificationCenter = () => {
               priority: 'low',
               data: payload.new
             };
+            
+            console.log('📩 Adding timer notification:', newNotification);
             setNotifications(prev => [newNotification, ...prev]);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Timers subscription status:', status);
+      });
 
     return () => {
       orderSubscription.unsubscribe();
