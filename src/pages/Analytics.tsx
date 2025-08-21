@@ -1,5 +1,6 @@
 import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { StatsCards } from "@/components/crm/StatsCards";
+import { AdvancedCharts } from "@/components/analytics/AdvancedCharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -190,6 +191,12 @@ const Analytics = () => {
               )}
             </CardContent>
           </Card>
+        </div>
+
+        {/* Advanced Charts */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-foreground mb-4">Advanced Analytics</h2>
+          <AdvancedCharts />
         </div>
 
         {/* Performance Metrics */}

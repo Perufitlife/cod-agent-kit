@@ -9,6 +9,7 @@ import Conversations from "./pages/Conversations";
 import Workflows from "./pages/Workflows";
 import Timers from "./pages/Timers";
 import Analytics from "./pages/Analytics";
+import Integrations from "./pages/Integrations";
 import Team from "./pages/Team";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/workflows" element={<Workflows />} />
           <Route path="/timers" element={<Timers />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/integrations" element={<Integrations />} />
           <Route path="/team" element={<Team />} />
           <Route path="/settings" element={<Settings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
