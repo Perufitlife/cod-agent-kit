@@ -12,22 +12,42 @@ type Inbox = { id: string; message_text: string; created_at: string | null };
 type Outbox = { id: string; message_text: string; created_at: string | null; sent_at: string | null };
 
 async function fetchThread(conversation_id: string) {
+  console.log("fetchThread for conversation:", conversation_id);
   const [inbox, outbox] = await Promise.all([
     supabase.from("messages_inbox").select("id,message_text,created_at").eq("conversation_id", conversation_id).order("created_at", { ascending: true }),
     supabase.from("messages_outbox").select("id,message_text,created_at,sent_at").eq("conversation_id", conversation_id).order("created_at", { ascending: true }),
   ]);
-  if (inbox.error) throw inbox.error;
-  if (outbox.error) throw outbox.error;
+  if (inbox.error) {
+    console.error("Error fetching inbox:", inbox.error);
+    throw inbox.error;
+  }
+  if (outbox.error) {
+    console.error("Error fetching outbox:", outbox.error);
+    throw outbox.error;
+  }
+  console.log("Fetched messages - inbox:", inbox.data?.length, "outbox:", outbox.data?.length);
   return { inbox: inbox.data || [], outbox: outbox.data || [] };
 }
 
 async function ensureConversation(phone: string) {
+  console.log("ensureConversation for phone:", phone);
   // Busca conversación existente o crea una
   const { data, error } = await supabase.from("conversations").select("id").eq("customer_phone", phone).maybeSingle();
-  if (error) throw error;
-  if (data?.id) return data.id;
+  if (error) {
+    console.error("Error finding conversation:", error);
+    throw error;
+  }
+  if (data?.id) {
+    console.log("Found existing conversation:", data.id);
+    return data.id;
+  }
+  console.log("Creating new conversation for phone:", phone);
   const ins = await supabase.from("conversations").insert({ tenant_id: "00000000-0000-0000-0000-000000000001", customer_phone: phone, status: "active" }).select("id").single();
-  if (ins.error) throw ins.error;
+  if (ins.error) {
+    console.error("Error creating conversation:", ins.error);
+    throw ins.error;
+  }
+  console.log("Created new conversation:", ins.data.id);
   return ins.data.id;
 }
 
@@ -53,12 +73,19 @@ export const MessageSandbox = () => {
 
   const sendMut = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/functions/v1/sandbox_message", {
+      const res = await fetch("https://ghsxvotykfhnfqyymdvh.supabase.co/functions/v1/sandbox_message", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { 
+          "content-type": "application/json",
+          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdoc3h2b3R5a2ZobmZxeXltZHZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3MzY1MjgsImV4cCI6MjA3MTMxMjUyOH0.NcFJ51O2Sssw-Y3aX1OKk9oWV7aVN69qUVLlAClaB-Q"
+        },
         body: JSON.stringify({ customer_phone: customerPhone, message_text: messageText, conversation_id: conversationId }),
       });
-      if (!res.ok) throw new Error("sandbox_message failed");
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("sandbox_message failed:", errorText);
+        throw new Error(`sandbox_message failed: ${errorText}`);
+      }
     },
     onSuccess: () => {
       setMessageText("");
@@ -68,9 +95,12 @@ export const MessageSandbox = () => {
 
   const messages = useMemo(() => {
     const list: { id: string; type: "customer" | "agent"; content: string; ts: string }[] = [];
+    console.log("Processing messages - inbox:", data?.inbox?.length, "outbox:", data?.outbox?.length);
     (data?.inbox || []).forEach((m: Inbox) => list.push({ id: `in-${m.id}`, type: "customer", content: m.message_text, ts: m.created_at || "" }));
     (data?.outbox || []).forEach((m: Outbox) => list.push({ id: `out-${m.id}`, type: "agent", content: m.message_text, ts: m.sent_at || m.created_at || "" }));
-    return list.sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
+    const sorted = list.sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
+    console.log("Total sorted messages:", sorted.length);
+    return sorted;
   }, [data]);
 
   return (
@@ -87,15 +117,28 @@ export const MessageSandbox = () => {
 
       <CardContent className="space-y-4">
         <div className="bg-muted/30 rounded-lg p-4 h-80 overflow-y-auto space-y-3">
-          {isLoading ? <div>Loading…</div> : messages.map((m) => (
-            <div key={m.id} className={`flex ${m.type === "customer" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${m.type === "customer" ? "bg-primary text-primary-foreground" : "bg-card text-card-foreground border border-border"}`}>
-                <div className="flex items-center space-x-2 mb-1">{m.type === "customer" ? <User className="w-3 h-3" /> : <Bot className="w-3 h-3" />}<span className="text-xs opacity-75">{m.type === "customer" ? "Customer" : "AI Agent"}</span></div>
-                <p className="text-sm">{m.content}</p>
-                <div className="flex items-center justify-end mt-2 space-x-1"><Clock className="w-3 h-3 opacity-50" /><span className="text-xs opacity-75">{m.ts ? new Date(m.ts).toLocaleTimeString() : ""}</span></div>
-              </div>
+          {isLoading ? (
+            <div className="text-center py-8">
+              <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+              <p className="mt-2 text-muted-foreground">Loading conversation...</p>
             </div>
-          ))}
+          ) : messages.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Bot className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p>Start a conversation by sending a message!</p>
+              <p className="text-xs mt-1">Try: "confirm my order" or "Hello"</p>
+            </div>
+          ) : (
+            messages.map((m) => (
+              <div key={m.id} className={`flex ${m.type === "customer" ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${m.type === "customer" ? "bg-primary text-primary-foreground" : "bg-card text-card-foreground border border-border"}`}>
+                  <div className="flex items-center space-x-2 mb-1">{m.type === "customer" ? <User className="w-3 h-3" /> : <Bot className="w-3 h-3" />}<span className="text-xs opacity-75">{m.type === "customer" ? "Customer" : "AI Agent"}</span></div>
+                  <p className="text-sm">{m.content}</p>
+                  <div className="flex items-center justify-end mt-2 space-x-1"><Clock className="w-3 h-3 opacity-50" /><span className="text-xs opacity-75">{m.ts ? new Date(m.ts).toLocaleTimeString() : ""}</span></div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="space-y-3 p-4 bg-muted/20 rounded-lg">
@@ -106,11 +149,36 @@ export const MessageSandbox = () => {
           <div>
             <label className="text-sm font-medium block">Message</label>
             <div className="flex space-x-2">
-              <Textarea value={messageText} onChange={(e) => setMessageText(e.target.value)} placeholder="Type your message…" className="flex-1 bg-background min-h-[60px]" />
-              <Button onClick={() => sendMut.mutate()} disabled={!messageText.trim() || !customerPhone.trim() || sendMut.isPending} className="bg-gradient-primary self-end">
-                <Send className="w-4 h-4" />
+              <Textarea 
+                value={messageText} 
+                onChange={(e) => setMessageText(e.target.value)} 
+                placeholder="Try: 'confirm my order', 'Hello', or 'yes'..." 
+                className="flex-1 bg-background min-h-[60px]"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!messageText.trim() || !customerPhone.trim() || sendMut.isPending) return;
+                    sendMut.mutate();
+                  }
+                }}
+              />
+              <Button 
+                onClick={() => sendMut.mutate()} 
+                disabled={!messageText.trim() || !customerPhone.trim() || sendMut.isPending} 
+                className="bg-gradient-primary self-end"
+              >
+                {sendMut.isPending ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
               </Button>
             </div>
+            {sendMut.error && (
+              <p className="text-xs text-destructive mt-1">
+                Error: {sendMut.error.message}
+              </p>
+            )}
           </div>
         </div>
       </CardContent>

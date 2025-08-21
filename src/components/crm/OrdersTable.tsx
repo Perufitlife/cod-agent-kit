@@ -32,9 +32,12 @@ async function fetchOrders(): Promise<OrderRow[]> {
 }
 
 async function createDemoOrder() {
-  const res = await fetch("/functions/v1/create_order", {
+  const res = await fetch("https://ghsxvotykfhnfqyymdvh.supabase.co/functions/v1/create_order", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { 
+      "content-type": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdoc3h2b3R5a2ZobmZxeXltZHZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3MzY1MjgsImV4cCI6MjA3MTMxMjUyOH0.NcFJ51O2Sssw-Y3aX1OKk9oWV7aVN69qUVLlAClaB-Q"
+    },
     body: JSON.stringify({
       source: "manual",
       data: {
@@ -48,7 +51,11 @@ async function createDemoOrder() {
       },
     }),
   });
-  if (!res.ok) throw new Error("create_order failed");
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error("create_order failed:", errorText);
+    throw new Error(`create_order failed: ${errorText}`);
+  }
   return res.json();
 }
 
