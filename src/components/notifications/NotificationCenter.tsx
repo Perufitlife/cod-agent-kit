@@ -195,23 +195,22 @@ export const NotificationCenter = () => {
       </Button>
 
       {isOpen && (
-        <Card className="fixed top-20 right-6 w-96 max-h-96 z-[9999] shadow-2xl bg-background border">
-          <CardHeader className="pb-3">
+        <Card className="fixed top-16 right-4 w-80 md:w-96 max-h-[32rem] z-[9999] shadow-xl bg-background/95 backdrop-blur-sm border border-border">
+          <CardHeader className="pb-2 px-4 pt-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm">Notifications</CardTitle>
-              <div className="flex items-center gap-2">
+              <CardTitle className="text-sm font-semibold">Notifications</CardTitle>
+              <div className="flex items-center gap-1">
                 {unreadCount > 0 && (
-                  <Button variant="ghost" size="sm" onClick={markAllAsRead}>
+                  <Button variant="ghost" size="sm" onClick={markAllAsRead} className="text-xs h-7 px-2">
                     <Check className="w-3 h-3 mr-1" />
                     Mark all read
                   </Button>
                 )}
-                <Button variant="ghost" size="sm" onClick={clearAll}>
-                  <X className="w-3 h-3 mr-1" />
+                <Button variant="ghost" size="sm" onClick={clearAll} className="text-xs h-7 px-2">
                   Clear all
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
-                  <X className="w-4 h-4" />
+                <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="h-7 w-7">
+                  <X className="w-3 h-3" />
                 </Button>
               </div>
             </div>
@@ -219,41 +218,48 @@ export const NotificationCenter = () => {
           <CardContent className="p-0">
             <ScrollArea className="max-h-80">
               {notifications.length === 0 ? (
-                <div className="p-4 text-center text-muted-foreground">
-                  No notifications
+                <div className="p-6 text-center text-muted-foreground text-sm">
+                  <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  No notifications yet
                 </div>
               ) : (
-                notifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    className={`p-3 border-b last:border-b-0 cursor-pointer hover:bg-muted/50 transition-colors ${
-                      !notification.read ? 'bg-primary/5' : ''
-                    }`}
-                    onClick={() => markAsRead(notification.id)}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`p-1 rounded-full bg-${getPriorityColor(notification.priority)}/20`}>
-                        {getIcon(notification.type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-medium truncate">
-                            {notification.title}
-                          </p>
-                          {!notification.read && (
-                            <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />
-                          )}
+                <div className="divide-y divide-border">
+                  {notifications.map((notification) => (
+                    <div
+                      key={notification.id}
+                      className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors duration-200 ${
+                        !notification.read ? 'bg-primary/5 border-l-2 border-l-primary' : ''
+                      }`}
+                      onClick={() => markAsRead(notification.id)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`p-2 rounded-full flex-shrink-0 ${
+                          notification.priority === 'high' ? 'bg-destructive/20 text-destructive' : 
+                          notification.priority === 'medium' ? 'bg-orange-500/20 text-orange-600' : 
+                          'bg-muted text-muted-foreground'
+                        }`}>
+                          {getIcon(notification.type)}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {notification.message}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {formatDistanceToNow(new Date(notification.timestamp), { addSuffix: true })}
-                        </p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <h4 className="text-sm font-medium leading-tight">
+                              {notification.title}
+                            </h4>
+                            {!notification.read && (
+                              <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0 mt-1" />
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                            {notification.message}
+                          </p>
+                          <p className="text-xs text-muted-foreground/70 mt-2">
+                            {formatDistanceToNow(new Date(notification.timestamp), { addSuffix: true })}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </ScrollArea>
           </CardContent>
