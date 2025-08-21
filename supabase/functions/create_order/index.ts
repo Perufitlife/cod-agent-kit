@@ -5,6 +5,12 @@ const url = Deno.env.get("SUPABASE_URL")!;
 const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(url, service);
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 type CreateOrderBody = {
   data: any;                 // {name,address,city,province,country,products:[{product_name,quantity,unit_price}], customer_phone?}
   source?: "manual" | "webhook";
@@ -12,6 +18,11 @@ type CreateOrderBody = {
 };
 
 Deno.serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   try {
     const body = (await req.json()) as CreateOrderBody;
     const tenant_id = "00000000-0000-0000-0000-000000000001"; // DEV: fijo. Luego lo sacas del JWT/host.
@@ -89,13 +100,14 @@ Deno.serve(async (req) => {
     }
 
     return new Response(JSON.stringify({ ok: true, order }), {
-      headers: { "content-type": "application/json" },
+      headers: { ...corsHeaders, "content-type": "application/json" },
     });
   } catch (e) {
-    console.error(e);
-    return new Response(JSON.stringify({ ok: false, error: String(e) }), {
+    console.error("create_order error:", e);
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    return new Response(JSON.stringify({ ok: false, error: errorMessage }), {
       status: 500,
-      headers: { "content-type": "application/json" },
+      headers: { ...corsHeaders, "content-type": "application/json" },
     });
   }
 });
