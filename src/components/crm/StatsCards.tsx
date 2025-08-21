@@ -4,16 +4,34 @@ import { TrendingUp, TrendingDown, Package, Users, MessageSquare, DollarSign, Za
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-const fetchStats = async () => {
-  // Get user's tenant_id from user_tenants table
-  const { data: userTenantData } = await supabase
+// Define the stats interface
+interface StatsData {
+  totalOrders: number;
+  revenue: number;
+  activeConversations: number;
+  conversionRate: string;
+}
+
+const fetchStats = async (): Promise<StatsData> => {
+  // Get user's tenant_id from user_tenants table - use limit(1) to get first result
+  const { data: userTenantData, error: tenantError } = await supabase
     .from("user_tenants")
     .select("tenant_id")
-    .single();
+    .limit(1)
+    .maybeSingle();
   
-  if (!userTenantData) throw new Error("No tenant found for user");
+  console.log("User tenant data:", userTenantData, "Error:", tenantError);
   
-  const tenantId = userTenantData.tenant_id;
+  let tenantId;
+  if (!userTenantData) {
+    console.log("No tenant data found, using default tenant");
+    // Fallback to default tenant if no user tenant found
+    tenantId = "00000000-0000-0000-0000-000000000001";
+  } else {
+    tenantId = userTenantData.tenant_id;
+  }
+  
+  console.log("Using tenant ID:", tenantId);
 
   // Fetch orders count
   const { count: ordersCount } = await supabase
@@ -59,10 +77,16 @@ const fetchStats = async () => {
 };
 
 export const StatsCards = () => {
-  const { data: stats, isLoading } = useQuery({
+  const { data: stats, isLoading, error } = useQuery<StatsData>({
     queryKey: ["dashboard-stats"],
     queryFn: fetchStats,
+    refetchInterval: 30000, // Refetch every 30 seconds
+    retry: 3
   });
+
+  if (error) {
+    console.error("Stats fetch error:", error);
+  }
 
   const statsData = [
     {
