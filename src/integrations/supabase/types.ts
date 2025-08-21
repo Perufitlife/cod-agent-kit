@@ -323,12 +323,14 @@ export type Database = {
       orders: {
         Row: {
           created_at: string | null
+          customer_phone_e164: string | null
           data: Json
           external_order_id: string | null
           id: string
           needs_attention: boolean | null
           notes: string[] | null
           schema_version: number
+          source: string | null
           status: string | null
           system_order_id: string
           tenant_id: string
@@ -336,12 +338,14 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          customer_phone_e164?: string | null
           data?: Json
           external_order_id?: string | null
           id?: string
           needs_attention?: boolean | null
           notes?: string[] | null
           schema_version: number
+          source?: string | null
           status?: string | null
           system_order_id: string
           tenant_id: string
@@ -349,12 +353,14 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          customer_phone_e164?: string | null
           data?: Json
           external_order_id?: string | null
           id?: string
           needs_attention?: boolean | null
           notes?: string[] | null
           schema_version?: number
+          source?: string | null
           status?: string | null
           system_order_id?: string
           tenant_id?: string
@@ -767,7 +773,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      ensure_increment_function: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      increment_sis_counter: {
+        Args: { p_tenant_id: string }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
