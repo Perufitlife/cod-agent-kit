@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Save, Play, ArrowDown, Settings } from "lucide-react";
+import { WorkflowTriggerEditor } from "./WorkflowTriggerEditor";
+import { WorkflowFlowViewer } from "./WorkflowFlowViewer";
 
 type WorkflowAction = {
   id: string;
@@ -23,6 +25,7 @@ type WorkflowDefinition = {
   description: string;
   is_active: boolean;
   actions: WorkflowAction[];
+  triggers?: any[];
 };
 
 interface WorkflowEditorProps {
@@ -37,7 +40,8 @@ export const WorkflowEditor = ({ workflow, onSave, onCancel }: WorkflowEditorPro
       name: "",
       description: "",
       is_active: true,
-      actions: []
+      actions: [],
+      triggers: []
     }
   );
 
@@ -197,6 +201,21 @@ export const WorkflowEditor = ({ workflow, onSave, onCancel }: WorkflowEditorPro
             />
             <Label htmlFor="active">Active</Label>
           </div>
+        </div>
+
+        {/* Triggers */}
+        <WorkflowTriggerEditor
+          triggers={formData.triggers}
+          onTriggersChange={(triggers) => setFormData(prev => ({ ...prev, triggers }))}
+        />
+
+        {/* Visual Flow Preview */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Workflow Flow Preview</h3>
+          <WorkflowFlowViewer 
+            workflowDefinition={{ actions: formData.actions }}
+            isEditable={false}
+          />
         </div>
 
         {/* Actions */}

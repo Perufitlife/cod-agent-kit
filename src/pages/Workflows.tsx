@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Workflow, Play, Pause, Plus, Settings, Edit, Trash2, Power } from "lucide-react";
 import { WorkflowEditor } from "@/components/workflows/WorkflowEditor";
+import { WorkflowFlowViewer } from "@/components/workflows/WorkflowFlowViewer";
 import { useToast } from "@/hooks/use-toast";
 
 type WorkflowDefinition = {
@@ -29,7 +30,15 @@ const Workflows = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('workflow_definitions')
-        .select('*')
+        .select(`
+          *,
+          workflow_versions!workflow_versions_workflow_id_fkey (
+            id,
+            version,
+            definition,
+            is_published
+          )
+        `)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -203,50 +212,89 @@ const Workflows = () => {
               ) : workflows && workflows.length > 0 ? (
                 <div className="space-y-4">
                   {workflows.map((workflow) => (
-                    <div key={workflow.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex-1">
-                        <h3 className="font-medium">{workflow.name}</h3>
-                        <p className="text-sm text-muted-foreground">{workflow.description}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Created: {new Date(workflow.created_at).toLocaleDateString()}
-                        </p>
+                    <div key={workflow.id} className="space-y-4 p-4 border rounded-lg bg-card">
+                      {/* Workflow Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-lg">{workflow.name}</h3>
+                          <p className="text-sm text-muted-foreground">{workflow.description}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Created: {new Date(workflow.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={workflow.is_active ? 'default' : 'secondary'}>
+                            {workflow.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => toggleWorkflowMutation.mutate({
+                              id: workflow.id,
+                              is_active: !workflow.is_active
+                            })}
+                          >
+                            <Power className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => {
+                              const publishedVersion = workflow.workflow_versions?.find(v => v.is_published);
+                              const definition = publishedVersion?.definition as any;
+                              setEditingWorkflow({ 
+                                ...workflow, 
+                                actions: definition?.actions || [] 
+                              });
+                              setShowEditor(true);
+                            }}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => {
+                              if (confirm('Are you sure you want to delete this workflow?')) {
+                                deleteWorkflowMutation.mutate(workflow.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={workflow.is_active ? 'default' : 'secondary'}>
-                          {workflow.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => toggleWorkflowMutation.mutate({
-                            id: workflow.id,
-                            is_active: !workflow.is_active
-                          })}
-                        >
-                          <Power className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => {
-                            setEditingWorkflow({ ...workflow, actions: [] });
-                            setShowEditor(true);
-                          }}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => {
-                            if (confirm('Are you sure you want to delete this workflow?')) {
-                              deleteWorkflowMutation.mutate(workflow.id);
-                            }
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+
+                      {/* Trigger Information */}
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-sm flex items-center gap-2">
+                          <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                          Triggers
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {workflow.trigger_conditions && Object.keys(workflow.trigger_conditions).length > 0 ? (
+                            Object.entries(workflow.trigger_conditions).map(([key, value]) => (
+                              <Badge key={key} variant="outline" className="text-xs">
+                                {key}: {String(value)}
+                              </Badge>
+                            ))
+                          ) : (
+                            <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
+                              New Order (status: pending)
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Visual Flow Preview */}
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-sm">Workflow Flow</h4>
+                        <div className="h-32">
+                          <WorkflowFlowViewer 
+                            workflowDefinition={workflow.workflow_versions?.find(v => v.is_published)?.definition as any}
+                          />
+                        </div>
                       </div>
                     </div>
                   ))}
