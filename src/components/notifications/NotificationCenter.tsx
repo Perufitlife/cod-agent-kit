@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Bell, Check, X, AlertCircle, MessageSquare, Package, Settings, BellRing } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+import { createPortal } from "react-dom";
 
 type Notification = {
   id: string;
@@ -21,6 +22,8 @@ type Notification = {
 export const NotificationCenter = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [buttonPosition, setButtonPosition] = useState({ top: 0, right: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -141,6 +144,29 @@ export const NotificationCenter = () => {
     };
   }, [toast]);
 
+  // Calculate button position when opened
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setButtonPosition({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right
+      });
+    }
+  }, [isOpen]);
+
+  // Close on escape key or outside click
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen]);
+
   const markAsRead = (id: string) => {
     setNotifications(prev =>
       prev.map(notif => notif.id === id ? { ...notif, read: true } : notif)
@@ -178,32 +204,39 @@ export const NotificationCenter = () => {
     <div className="relative">
       {/* Notification Bell Button */}
       <Button
+        ref={buttonRef}
         variant="ghost"
         size="icon"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative hover:bg-muted/50 transition-colors"
+        className="relative hover:bg-white/10 transition-colors text-white"
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
           <Badge 
-            className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 text-[10px] flex items-center justify-center bg-red-500 text-white border-2 border-background animate-pulse"
+            className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 text-[10px] flex items-center justify-center bg-red-500 text-white border-2 border-white/20 animate-pulse"
           >
             {unreadCount > 9 ? '9+' : unreadCount}
           </Badge>
         )}
       </Button>
 
-      {/* Notification Dropdown */}
-      {isOpen && (
+      {/* Render dropdown in portal to escape sidebar context */}
+      {isOpen && createPortal(
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 z-[100]" 
+            className="fixed inset-0 z-[200]" 
             onClick={() => setIsOpen(false)}
           />
           
           {/* Notification Panel */}
-          <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 z-[101] animate-scale-in">
+          <div 
+            className="fixed z-[201] w-80 sm:w-96 animate-scale-in"
+            style={{
+              top: `${buttonPosition.top}px`,
+              right: `${buttonPosition.right}px`,
+            }}
+          >
             <div className="bg-background/95 backdrop-blur-md border border-border/50 rounded-2xl shadow-2xl overflow-hidden">
               {/* Header */}
               <div className="flex items-center justify-between p-4 pb-2 border-b border-border/30">
@@ -264,7 +297,7 @@ export const NotificationCenter = () => {
                   </div>
                 ) : (
                   <div className="p-1">
-                    {notifications.map((notification, index) => (
+                    {notifications.map((notification) => (
                       <div
                         key={notification.id}
                         className={`group relative p-3 mx-1 my-1 rounded-xl cursor-pointer transition-all duration-200 hover:bg-muted/40 ${
@@ -314,7 +347,8 @@ export const NotificationCenter = () => {
               </ScrollArea>
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
