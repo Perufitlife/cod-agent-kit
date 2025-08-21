@@ -36,109 +36,146 @@ const createNodesFromDefinition = (definition: any): { nodes: Node[], edges: Edg
     position: { x: 100, y: 50 },
     data: { 
       label: (
-        <div className="text-center">
-          <div className="font-semibold text-green-600">START</div>
-          <div className="text-xs text-muted-foreground">New Order Trigger</div>
+        <div className="text-center p-3">
+          <div className="text-2xl mb-2">🚀</div>
+          <div className="font-bold text-green-700">INICIO</div>
+          <div className="text-xs text-green-600 mt-1">Nueva Orden Creada</div>
         </div>
       )
     },
-    style: { background: '#dcfce7', border: '2px solid #16a34a' }
+    style: { 
+      background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)', 
+      border: '3px solid #16a34a',
+      borderRadius: '16px',
+      minWidth: '160px',
+      boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)'
+    }
   });
 
-  // Create action nodes
+  // Create action nodes with improved layout
+  let yPosition = 150;
+  const xSpacing = 250;
+  
   definition.actions?.forEach((action: any, index: number) => {
     const nodeId = `action-${index}`;
     let nodeLabel = '';
-    let nodeColor = '#f3f4f6';
-    let borderColor = '#6b7280';
-    let nodeType = 'default';
+    let emoji = '';
+    let nodeColor = '#ffffff';
+    let borderColor = '#e2e8f0';
+    let textColor = '#1e293b';
 
     switch (action.action_type) {
       case 'wait':
-        nodeLabel = `Wait ${action.config?.duration || 1} min`;
+        emoji = '⏱️';
+        nodeLabel = `Esperar ${action.config?.duration || 1} min`;
         nodeColor = '#fef3c7';
         borderColor = '#f59e0b';
+        textColor = '#92400e';
         break;
       case 'send_message':
-        nodeLabel = `Send Message`;
+        emoji = '💬';
+        nodeLabel = 'Enviar Mensaje';
         nodeColor = '#dbeafe';
         borderColor = '#3b82f6';
+        textColor = '#1e40af';
         break;
       case 'update_order':
-        nodeLabel = `Update to: ${action.config?.status || 'Unknown'}`;
+        emoji = '📋';
+        nodeLabel = `Actualizar: ${action.config?.status || 'Estado'}`;
         nodeColor = '#e0e7ff';
         borderColor = '#6366f1';
-        break;
-      case 'create_timer':
-        nodeLabel = `Timer: ${action.config?.purpose || 'Unknown'}`;
-        nodeColor = '#fce7f3';
-        borderColor = '#ec4899';
+        textColor = '#4338ca';
         break;
       case 'check_condition':
-        nodeLabel = action.config?.condition_type === 'has_tag' 
-          ? `Has Tag: ${action.config?.tag_name || '?'}` 
-          : `Check: ${action.config?.condition_type || 'Unknown'}`;
-        nodeColor = '#fbbf24';
+        emoji = '❓';
+        nodeLabel = `¿Tiene "${action.config?.tag_name || 'etiqueta'}"?`;
+        nodeColor = '#fef3c7';
         borderColor = '#f59e0b';
-        nodeType = 'default'; // Could be a diamond shape for conditions
+        textColor = '#92400e';
         break;
       case 'ai_agent_decision':
-        nodeLabel = `AI Decision`;
-        nodeColor = '#c084fc';
+        emoji = '🤖';
+        nodeLabel = 'IA Analiza Orden';
+        nodeColor = '#f3e8ff';
         borderColor = '#9333ea';
-        break;
-      case 'branch':
-        nodeLabel = `Branch: ${action.config?.description || 'Split'}`;
-        nodeColor = '#fb7185';
-        borderColor = '#e11d48';
+        textColor = '#7c3aed';
         break;
       case 'end_workflow':
-        nodeLabel = `End: ${action.config?.reason || 'Complete'}`;
+        emoji = '🛑';
+        nodeLabel = action.config?.reason || 'Fin del Flujo';
         nodeColor = '#fee2e2';
         borderColor = '#dc2626';
+        textColor = '#dc2626';
         break;
       default:
+        emoji = '⚡';
         nodeLabel = action.action_type;
     }
 
-    // Special styling for conditional nodes
-    const isConditional = action.action_type === 'check_condition' || action.action_type === 'ai_agent_decision';
-    const nodeStyle = {
-      background: nodeColor,
-      border: `2px solid ${borderColor}`,
-      ...(isConditional && {
-        borderRadius: '0', // Make it diamond-like
-        transform: 'rotate(45deg)',
-        width: '100px',
-        height: '100px',
-      })
-    };
-
+    // Special positioning for conditional branches
+    let xPos = 150;
+    const isConditional = action.action_type === 'check_condition';
+    
     nodes.push({
       id: nodeId,
-      type: nodeType,
-      position: { x: 100, y: 150 + (index * 120) },
+      type: 'default',
+      position: { x: xPos, y: yPosition },
       data: { 
         label: (
-          <div className="text-center" style={isConditional ? { transform: 'rotate(-45deg)' } : {}}>
-            <div className="font-medium text-xs">{nodeLabel}</div>
-            <Badge variant="outline" className="text-xs mt-1">
-              Step {action.sequence_order}
+          <div className="text-center p-3">
+            <div className="text-2xl mb-2">{emoji}</div>
+            <div className="font-semibold text-sm mb-1" style={{ color: textColor }}>
+              {nodeLabel}
+            </div>
+            <Badge 
+              variant="outline" 
+              className="text-xs"
+              style={{ 
+                borderColor: borderColor,
+                color: textColor,
+                backgroundColor: 'rgba(255,255,255,0.8)'
+              }}
+            >
+              Paso {action.sequence_order}
             </Badge>
           </div>
         )
       },
-      style: nodeStyle
+      style: { 
+        background: nodeColor,
+        border: `3px solid ${borderColor}`,
+        borderRadius: '16px',
+        minWidth: '180px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+      }
     });
 
-    // Create edge from previous node with labels for conditional flows
+    // Handle special cases for end_workflow after check_condition
+    if (action.action_type === 'end_workflow' && index > 0) {
+      const prevAction = definition.actions[index - 1];
+      if (prevAction?.action_type === 'check_condition') {
+        // Position this as a side branch (NO path)
+        nodes[nodes.length - 1].position.x = 400;
+        nodes[nodes.length - 1].position.y = yPosition - 60;
+      }
+    }
+
+    // Create edge from previous node
     const sourceId = index === 0 ? 'start' : `action-${index - 1}`;
     const prevAction = index > 0 ? definition.actions[index - 1] : null;
     
     // Add edge labels for conditional flows
     let edgeLabel = '';
-    if (prevAction && (prevAction.action_type === 'check_condition' || prevAction.action_type === 'ai_agent_decision')) {
-      edgeLabel = 'YES'; // Default to YES path
+    let edgeColor = '#64748b';
+    
+    if (prevAction?.action_type === 'check_condition') {
+      if (action.action_type === 'end_workflow') {
+        edgeLabel = 'SÍ (tiene etiqueta)';
+        edgeColor = '#ef4444';
+      } else {
+        edgeLabel = 'NO (continúa)';
+        edgeColor = '#22c55e';
+      }
     }
 
     edges.push({
@@ -147,36 +184,62 @@ const createNodesFromDefinition = (definition: any): { nodes: Node[], edges: Edg
       target: nodeId,
       type: 'smoothstep',
       label: edgeLabel,
-      labelStyle: { fill: '#666', fontWeight: 600 },
-      labelBgStyle: { fill: '#fff', fillOpacity: 0.8 }
+      labelStyle: { 
+        fill: edgeColor, 
+        fontWeight: 700, 
+        fontSize: '12px',
+        fontFamily: 'system-ui'
+      },
+      labelBgStyle: { 
+        fill: '#ffffff', 
+        fillOpacity: 0.9
+      },
+      style: { 
+        stroke: edgeColor, 
+        strokeWidth: 2 
+      }
     });
+
+    yPosition += 140;
   });
 
-  // Add end node
-  const lastActionIndex = definition.actions.length - 1;
-  const lastNodeId = lastActionIndex >= 0 ? `action-${lastActionIndex}` : 'start';
+  // Add end node only for non-end actions
+  const hasEndAction = definition.actions.some((action: any) => action.action_type === 'end_workflow');
   
-  nodes.push({
-    id: 'end',
-    type: 'default',
-    position: { x: 100, y: 150 + (definition.actions.length * 120) },
-    data: { 
-      label: (
-        <div className="text-center">
-          <div className="font-semibold text-red-600">END</div>
-          <div className="text-xs text-muted-foreground">Workflow Complete</div>
-        </div>
-      )
-    },
-    style: { background: '#fee2e2', border: '2px solid #dc2626' }
-  });
+  if (!hasEndAction) {
+    const lastActionIndex = definition.actions.length - 1;
+    const lastNodeId = lastActionIndex >= 0 ? `action-${lastActionIndex}` : 'start';
+    
+    nodes.push({
+      id: 'end',
+      type: 'default',
+      position: { x: 150, y: yPosition },
+      data: { 
+        label: (
+          <div className="text-center p-3">
+            <div className="text-2xl mb-2">🏁</div>
+            <div className="font-bold text-blue-700">COMPLETADO</div>
+            <div className="text-xs text-blue-600 mt-1">Flujo Terminado</div>
+          </div>
+        )
+      },
+      style: { 
+        background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)', 
+        border: '3px solid #3b82f6',
+        borderRadius: '16px',
+        minWidth: '160px',
+        boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)'
+      }
+    });
 
-  edges.push({
-    id: `edge-${lastNodeId}-end`,
-    source: lastNodeId,
-    target: 'end',
-    type: 'smoothstep'
-  });
+    edges.push({
+      id: `edge-${lastNodeId}-end`,
+      source: lastNodeId,
+      target: 'end',
+      type: 'smoothstep',
+      style: { stroke: '#3b82f6', strokeWidth: 2 }
+    });
+  }
 
   return { nodes, edges };
 };
@@ -219,7 +282,7 @@ export const WorkflowFlowViewer = ({
   }
 
   return (
-    <div className="h-96 w-full border rounded-lg overflow-hidden bg-background">
+    <div className="h-[600px] w-full border-2 rounded-xl overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50 shadow-lg">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -227,20 +290,36 @@ export const WorkflowFlowViewer = ({
         onEdgesChange={isEditable ? onEdgesChange : undefined}
         onConnect={isEditable ? onConnect : undefined}
         fitView
+        fitViewOptions={{
+          padding: 0.2,
+          maxZoom: 1.2,
+          minZoom: 0.5
+        }}
         attributionPosition="bottom-right"
         nodesDraggable={isEditable}
         nodesConnectable={isEditable}
         elementsSelectable={isEditable}
+        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       >
-        <Controls />
+        <Controls className="bg-white/80 backdrop-blur border border-slate-200 rounded-lg shadow-md" />
         <MiniMap 
+          className="bg-white/80 backdrop-blur border border-slate-200 rounded-lg shadow-md"
           nodeColor={(node) => {
             if (node.id === 'start') return '#16a34a';
-            if (node.id === 'end') return '#dc2626';
+            if (node.id === 'end') return '#3b82f6';
+            if (node.id.includes('action-')) {
+              const nodeData = nodes.find(n => n.id === node.id);
+              const borderColor = nodeData?.style?.border;
+              if (typeof borderColor === 'string') {
+                return borderColor.split(' ')[2] || '#6b7280';
+              }
+              return '#6b7280';
+            }
             return '#6b7280';
           }}
+          maskColor="rgba(255, 255, 255, 0.6)"
         />
-        <Background />
+        <Background color="#e2e8f0" gap={20} />
       </ReactFlow>
     </div>
   );

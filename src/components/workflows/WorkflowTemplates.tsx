@@ -6,7 +6,7 @@ export const createOrderProcessingWorkflow = (): WorkflowAction[] => {
       id: crypto.randomUUID(),
       sequence_order: 1,
       action_type: "wait",
-      config: { duration: 1 }, // 1 minute delay
+      config: { duration: 1 },
     },
     {
       id: crypto.randomUUID(),
@@ -21,32 +21,32 @@ export const createOrderProcessingWorkflow = (): WorkflowAction[] => {
       id: crypto.randomUUID(),
       sequence_order: 3,
       action_type: "end_workflow",
-      config: { reason: "Order already linked - no further processing needed" },
+      config: { reason: "Orden ya vinculada - no requiere procesamiento" },
     },
     {
       id: crypto.randomUUID(),
       sequence_order: 4,
       action_type: "ai_agent_decision",
       config: {
-        prompt: `Analyze the order information and determine if I can confirm the order and schedule it for tomorrow. 
-        
-Consider the following order details:
-- Phone: {{customer_phone}}
-- Name: {{customer_name}}
-- Order Number: {{order_id}}
-- Address: {{address}}
-- Reference: {{reference}}
-- District: {{district}}
-- City: {{city}}
-- Province: {{province}}
-- Country: {{country}}
-- Products: {{products}}
-- Quantity: {{quantity}}
+        prompt: `Analiza la información de la orden y determina si puedo confirmarla y programarla para mañana.
+
+Información de la orden:
+- Teléfono: {{customer_phone}}
+- Nombre: {{customer_name}}
+- Número de orden: {{order_id}}
+- Dirección: {{address}}
+- Referencia: {{reference}}
+- Distrito: {{district}}
+- Ciudad: {{city}}
+- Provincia: {{province}}
+- País: {{country}}
+- Productos: {{products}}
+- Cantidad: {{quantity}}
 - Total: {{total}}
 
-Decide if you should:
-1. confirm_order - if all information looks complete and valid
-2. reject_order - if critical information is missing or invalid`,
+Decide:
+1. confirm_order - si toda la información está completa y válida
+2. reject_order - si falta información crítica o hay inconsistencias`,
         option_1: "confirm_order",
         option_2: "reject_order"
       },
@@ -54,21 +54,15 @@ Decide if you should:
     {
       id: crypto.randomUUID(),
       sequence_order: 5,
-      action_type: "branch",
-      config: { description: "Handle AI decision result" },
-    },
-    {
-      id: crypto.randomUUID(),
-      sequence_order: 6,
       action_type: "update_order",
       config: { status: "confirmed" },
     },
     {
       id: crypto.randomUUID(),
-      sequence_order: 7,
+      sequence_order: 6,
       action_type: "send_message",
       config: { 
-        message: "¡Gracias! Tu pedido ha sido confirmado y programado para mañana. Recibirás más detalles pronto." 
+        message: "¡Perfecto! Tu pedido ha sido confirmado y programado para mañana. Te enviaremos los detalles de entrega pronto. 📦✅" 
       },
     },
   ];
@@ -76,8 +70,8 @@ Decide if you should:
 
 export const workflowTemplates = {
   'order_processing': {
-    name: 'Order Processing with AI',
-    description: 'Complete order processing workflow with AI validation and conditional logic',
+    name: 'Procesamiento Inteligente de Órdenes',
+    description: 'Flujo automático con validación IA: Espera 1min → Verifica etiquetas → IA analiza → Confirma/Rechaza',
     actions: createOrderProcessingWorkflow(),
     triggers: [
       {
