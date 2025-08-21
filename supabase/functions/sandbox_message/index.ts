@@ -96,14 +96,17 @@ Deno.serve(async (req) => {
     let intent = "ask_question";
     let confidence = 0.5;
     let entities = {};
+    let tenantSettings = null;
     
     try {
-      // Primero intentar con OpenAI si está configurado
-      const { data: tenantSettings } = await supabase
+      // Primero obtener configuración del tenant
+      const { data: settings } = await supabase
         .from("tenant_settings")
         .select("openai_api_key_encrypted, ai_mode")
         .eq("tenant_id", tenant_id)
         .single();
+      
+      tenantSettings = settings;
 
       if (tenantSettings?.openai_api_key_encrypted) {
         console.log("Using OpenAI for intent detection");
