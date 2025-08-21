@@ -81,6 +81,19 @@ async function deleteOrderComplete(orderId: string) {
   return data;
 }
 
+async function cleanupAllData(tenantId: string) {
+  const { data, error } = await supabase.functions.invoke('cleanup_all_data', {
+    body: { tenant_id: tenantId }
+  });
+  
+  if (error) {
+    console.error("cleanup_all_data failed:", error);
+    throw new Error(`Cleanup failed: ${error.message}`);
+  }
+  
+  return data;
+}
+
 export const OrdersTable = () => {
   console.log("OrdersTable rendering");
   
@@ -99,6 +112,7 @@ export const OrdersTable = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
+  const [showCleanupDialog, setShowCleanupDialog] = useState(false);
 
   const createMut = useMutation({ 
     mutationFn: createDemoOrder, 
@@ -131,6 +145,30 @@ export const OrdersTable = () => {
     }
   });
 
+  const cleanupMut = useMutation({ 
+    mutationFn: () => cleanupAllData("00000000-0000-0000-0000-000000000001"), // Default tenant
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      qc.invalidateQueries({ queryKey: ["conversations"] });
+      qc.invalidateQueries({ queryKey: ["messages_inbox"] });
+      toast({
+        title: "All data cleaned",
+        description: "All orders, conversations, and messages have been permanently deleted.",
+      });
+      setShowCleanupDialog(false);
+    },
+    onError: (error) => {
+      console.error("Cleanup error:", error);
+      toast({
+        title: "Cleanup failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      setShowCleanupDialog(false);
+    }
+  });
+
   console.log("Orders data:", orders, "Loading:", isLoading, "Error:", error);
 
   const filtered = orders.filter(o => {
@@ -151,10 +189,21 @@ export const OrdersTable = () => {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-xl font-semibold">Orders Management</CardTitle>
-          <Button onClick={() => createMut.mutate()} disabled={createMut.isPending} className="bg-gradient-primary hover:opacity-90">
-            <Plus className="w-4 h-4 mr-2" />
-            {createMut.isPending ? "Creating..." : "Create Demo Order"}
-          </Button>
+          <div className="flex items-center space-x-2">
+            <Button 
+              onClick={() => setShowCleanupDialog(true)} 
+              disabled={cleanupMut.isPending}
+              variant="destructive"
+              size="sm"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              {cleanupMut.isPending ? "Cleaning..." : "Clean All Data"}
+            </Button>
+            <Button onClick={() => createMut.mutate()} disabled={createMut.isPending} className="bg-gradient-primary hover:opacity-90">
+              <Plus className="w-4 h-4 mr-2" />
+              {createMut.isPending ? "Creating..." : "Create Demo Order"}
+            </Button>
+          </div>
         </div>
 
         <div className="flex items-center space-x-4 mt-4">
@@ -276,6 +325,37 @@ export const OrdersTable = () => {
               className="bg-destructive hover:bg-destructive/90"
             >
               {deleteMut.isPending ? "Deleting..." : "Delete Order"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cleanup All Data Confirmation Dialog */}
+      <AlertDialog open={showCleanupDialog} onOpenChange={setShowCleanupDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clean All Data</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete ALL data? This will permanently remove:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li><strong>All orders</strong> in the system</li>
+                <li><strong>All conversations</strong> and messages</li>
+                <li><strong>All workflow runs</strong> and timers</li>
+                <li><strong>All events</strong> and activity logs</li>
+              </ul>
+              <div className="mt-3 p-3 bg-destructive/10 rounded-md">
+                <strong className="text-destructive">⚠️ This is a complete system reset and cannot be undone!</strong>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => cleanupMut.mutate()}
+              disabled={cleanupMut.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {cleanupMut.isPending ? "Cleaning All Data..." : "Delete Everything"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
