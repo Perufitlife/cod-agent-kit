@@ -1,76 +1,71 @@
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "./StatusBadge";
-import { Search, Plus, Filter, Eye } from "lucide-react";
+import { Search, Plus, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-interface Order {
+type OrderRow = {
   id: string;
-  systemOrderId: string;
-  status: string;
-  customerName?: string;
-  customerPhone?: string;
-  totalAmount?: string;
-  createdAt: string;
-  needsAttention: boolean;
+  system_order_id: string;
+  status: string | null;
+  data: any;
+  created_at: string | null;
+  needs_attention: boolean | null;
+  tenant_id: string;
+};
+
+async function fetchOrders(): Promise<OrderRow[]> {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("id, system_order_id, status, data, created_at, needs_attention, tenant_id")
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) throw error;
+  return data || [];
 }
 
-// Mock data
-const mockOrders: Order[] = [
-  {
-    id: "1",
-    systemOrderId: "SIS-2001",
-    status: "pending",
-    customerName: "Maria Rodriguez",
-    customerPhone: "+1234567890",
-    totalAmount: "$89.99",
-    createdAt: "2024-01-21T10:30:00Z",
-    needsAttention: false,
-  },
-  {
-    id: "2", 
-    systemOrderId: "SIS-2002",
-    status: "confirmed",
-    customerName: "John Smith",
-    customerPhone: "+1234567891",
-    totalAmount: "$156.50",
-    createdAt: "2024-01-21T09:15:00Z",
-    needsAttention: false,
-  },
-  {
-    id: "3",
-    systemOrderId: "SIS-2003", 
-    status: "awaiting_customer_contact",
-    customerName: "Ana García",
-    customerPhone: "+1234567892",
-    totalAmount: "$203.25",
-    createdAt: "2024-01-21T08:45:00Z",
-    needsAttention: true,
-  }
-];
+async function createDemoOrder() {
+  const res = await fetch("/functions/v1/create_order", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      source: "manual",
+      data: {
+        name: "Demo Customer",
+        address: "123 Test St",
+        city: "Testville",
+        province: "TS",
+        country: "US",
+        customer_phone: "+1234567890",
+        products: [{ product_name: "Gadget", quantity: 1, unit_price: 49.9 }],
+      },
+    }),
+  });
+  if (!res.ok) throw new Error("create_order failed");
+  return res.json();
+}
 
 export const OrdersTable = () => {
+  const qc = useQueryClient();
+  const { data: orders = [], isLoading } = useQuery({ queryKey: ["orders"], queryFn: fetchOrders });
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const filteredOrders = mockOrders.filter(order => {
-    const matchesSearch = !searchTerm || 
-      order.systemOrderId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customerPhone?.includes(searchTerm);
-    
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
-    
+  const createMut = useMutation({ mutationFn: createDemoOrder, onSuccess: () => qc.invalidateQueries({ queryKey: ["orders"] }) });
+
+  const filtered = orders.filter(o => {
+    const name = o.data?.name?.toString().toLowerCase() || "";
+    const phone = o.data?.customer_phone || "";
+    const s = searchTerm.toLowerCase();
+    const matchesSearch = !s || o.system_order_id.toLowerCase().includes(s) || name.includes(s) || phone.includes(searchTerm);
+    const matchesStatus = statusFilter === "all" || (o.status || "").toLowerCase() === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -79,22 +74,16 @@ export const OrdersTable = () => {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-xl font-semibold">Orders Management</CardTitle>
-          <Button className="bg-gradient-primary hover:opacity-90 transition-opacity">
+          <Button onClick={() => createMut.mutate()} disabled={createMut.isPending} className="bg-gradient-primary hover:opacity-90">
             <Plus className="w-4 h-4 mr-2" />
-            New Order
+            {createMut.isPending ? "Creating..." : "Create Demo Order"}
           </Button>
         </div>
-        
-        {/* Filters */}
+
         <div className="flex items-center space-x-4 mt-4">
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <Input
-              placeholder="Search orders, customers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Input placeholder="Search orders, customers..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
           </div>
           <Button variant="outline" size="sm">
             <Filter className="w-4 h-4 mr-2" />
@@ -104,56 +93,37 @@ export const OrdersTable = () => {
       </CardHeader>
 
       <CardContent>
-        <div className="rounded-lg border overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="font-semibold">Order ID</TableHead>
-                <TableHead className="font-semibold">Customer</TableHead>
-                <TableHead className="font-semibold">Status</TableHead>
-                <TableHead className="font-semibold">Amount</TableHead>
-                <TableHead className="font-semibold">Created</TableHead>
-                <TableHead className="font-semibold">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOrders.map((order) => (
-                <TableRow key={order.id} className="hover:bg-muted/50 transition-colors">
-                  <TableCell className="font-medium">
-                    <div className="flex items-center space-x-2">
-                      <span>{order.systemOrderId}</span>
-                      {order.needsAttention && (
-                        <Badge variant="destructive" className="text-xs">
-                          Needs Attention
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium text-foreground">{order.customerName}</p>
-                      <p className="text-sm text-muted-foreground">{order.customerPhone}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={order.status} />
-                  </TableCell>
-                  <TableCell className="font-semibold text-foreground">
-                    {order.totalAmount}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(order.createdAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="sm" className="hover:bg-primary/10">
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                  </TableCell>
+        {isLoading ? <div className="p-6">Loading…</div> : (
+          <div className="rounded-lg border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="font-semibold">Order ID</TableHead>
+                  <TableHead className="font-semibold">Customer</TableHead>
+                  <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="font-semibold">Created</TableHead>
+                  <TableHead className="font-semibold">Flags</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((o) => (
+                  <TableRow key={o.id} className="hover:bg-muted/50">
+                    <TableCell className="font-medium">{o.system_order_id}</TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{o.data?.name || "-"}</p>
+                        <p className="text-sm text-muted-foreground">{o.data?.customer_phone || "-"}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell><StatusBadge status={(o.status || "pending")} /></TableCell>
+                    <TableCell className="text-muted-foreground">{o.created_at ? new Date(o.created_at).toLocaleString() : "-"}</TableCell>
+                    <TableCell>{o.needs_attention ? <Badge variant="destructive">Needs Attention</Badge> : null}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

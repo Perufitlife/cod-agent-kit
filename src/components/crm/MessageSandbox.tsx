@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,80 +8,70 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Send, Smartphone, Bot, User, Clock } from "lucide-react";
 
-interface Message {
-  id: string;
-  type: "customer" | "agent";
-  content: string;
-  timestamp: string;
-  phone?: string;
+type Inbox = { id: string; message_text: string; created_at: string | null };
+type Outbox = { id: string; message_text: string; created_at: string | null; sent_at: string | null };
+
+async function fetchThread(conversation_id: string) {
+  const [inbox, outbox] = await Promise.all([
+    supabase.from("messages_inbox").select("id,message_text,created_at").eq("conversation_id", conversation_id).order("created_at", { ascending: true }),
+    supabase.from("messages_outbox").select("id,message_text,created_at,sent_at").eq("conversation_id", conversation_id).order("created_at", { ascending: true }),
+  ]);
+  if (inbox.error) throw inbox.error;
+  if (outbox.error) throw outbox.error;
+  return { inbox: inbox.data || [], outbox: outbox.data || [] };
 }
 
-const mockMessages: Message[] = [
-  {
-    id: "1",
-    type: "customer",
-    content: "Hi, I want to confirm my order #SIS-2001",
-    timestamp: "2024-01-21T10:30:00Z",
-    phone: "+1234567890"
-  },
-  {
-    id: "2", 
-    type: "agent",
-    content: "Hello Maria! I found your order SIS-2001 for delivery to 123 Main St. The total is $89.99 with delivery scheduled for Jan 22. Reply YES to confirm or let me know if you need any changes.",
-    timestamp: "2024-01-21T10:30:15Z"
-  },
-  {
-    id: "3",
-    type: "customer", 
-    content: "Yes, confirm the order please",
-    timestamp: "2024-01-21T10:31:00Z",
-    phone: "+1234567890"
-  },
-  {
-    id: "4",
-    type: "agent",
-    content: "Perfect! Your order SIS-2001 has been confirmed. We'll update you when it ships. Thank you for your business!",
-    timestamp: "2024-01-21T10:31:10Z"
-  }
-];
+async function ensureConversation(phone: string) {
+  // Busca conversación existente o crea una
+  const { data, error } = await supabase.from("conversations").select("id").eq("customer_phone", phone).maybeSingle();
+  if (error) throw error;
+  if (data?.id) return data.id;
+  const ins = await supabase.from("conversations").insert({ tenant_id: "00000000-0000-0000-0000-000000000001", customer_phone: phone, status: "active" }).select("id").single();
+  if (ins.error) throw ins.error;
+  return ins.data.id;
+}
 
 export const MessageSandbox = () => {
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
+  const qc = useQueryClient();
   const [customerPhone, setCustomerPhone] = useState("+1234567890");
+  const [conversationId, setConversationId] = useState<string>("");
   const [messageText, setMessageText] = useState("");
 
-  const sendMessage = () => {
-    if (!messageText.trim() || !customerPhone.trim()) return;
+  useEffect(() => {
+    (async () => {
+      const id = await ensureConversation(customerPhone);
+      setConversationId(id);
+    })();
+  }, [customerPhone]);
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      type: "customer",
-      content: messageText,
-      timestamp: new Date().toISOString(),
-      phone: customerPhone
-    };
+  const { data, isLoading } = useQuery({
+    queryKey: ["thread", conversationId],
+    queryFn: () => fetchThread(conversationId),
+    enabled: !!conversationId,
+    refetchInterval: 1500,
+  });
 
-    setMessages(prev => [...prev, newMessage]);
-    setMessageText("");
+  const sendMut = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/functions/v1/sandbox_message", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ customer_phone: customerPhone, message_text: messageText, conversation_id: conversationId }),
+      });
+      if (!res.ok) throw new Error("sandbox_message failed");
+    },
+    onSuccess: () => {
+      setMessageText("");
+      qc.invalidateQueries({ queryKey: ["thread", conversationId] });
+    },
+  });
 
-    // Simulate AI response after a delay
-    setTimeout(() => {
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        type: "agent", 
-        content: "Thanks for your message! Our AI agent is processing your request and will respond shortly.",
-        timestamp: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, aiResponse]);
-    }, 2000);
-  };
-
-  const formatTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  };
+  const messages = useMemo(() => {
+    const list: { id: string; type: "customer" | "agent"; content: string; ts: string }[] = [];
+    (data?.inbox || []).forEach((m: Inbox) => list.push({ id: `in-${m.id}`, type: "customer", content: m.message_text, ts: m.created_at || "" }));
+    (data?.outbox || []).forEach((m: Outbox) => list.push({ id: `out-${m.id}`, type: "agent", content: m.message_text, ts: m.sent_at || m.created_at || "" }));
+    return list.sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
+  }, [data]);
 
   return (
     <Card className="shadow-medium">
@@ -89,85 +81,33 @@ export const MessageSandbox = () => {
             <Smartphone className="w-5 h-5 text-primary" />
             <span>Message Sandbox</span>
           </CardTitle>
-          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-            WhatsApp Simulation
-          </Badge>
+          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">WhatsApp Simulation</Badge>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Messages Area */}
         <div className="bg-muted/30 rounded-lg p-4 h-80 overflow-y-auto space-y-3">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.type === "customer" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${
-                  message.type === "customer"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-card text-card-foreground border border-border"
-                }`}
-              >
-                <div className="flex items-center space-x-2 mb-1">
-                  {message.type === "customer" ? (
-                    <User className="w-3 h-3" />
-                  ) : (
-                    <Bot className="w-3 h-3" />
-                  )}
-                  <span className="text-xs opacity-75">
-                    {message.type === "customer" ? "Customer" : "AI Agent"}
-                  </span>
-                </div>
-                <p className="text-sm">{message.content}</p>
-                <div className="flex items-center justify-end mt-2 space-x-1">
-                  <Clock className="w-3 h-3 opacity-50" />
-                  <span className="text-xs opacity-75">
-                    {formatTime(message.timestamp)}
-                  </span>
-                </div>
+          {isLoading ? <div>Loading…</div> : messages.map((m) => (
+            <div key={m.id} className={`flex ${m.type === "customer" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${m.type === "customer" ? "bg-primary text-primary-foreground" : "bg-card text-card-foreground border border-border"}`}>
+                <div className="flex items-center space-x-2 mb-1">{m.type === "customer" ? <User className="w-3 h-3" /> : <Bot className="w-3 h-3" />}<span className="text-xs opacity-75">{m.type === "customer" ? "Customer" : "AI Agent"}</span></div>
+                <p className="text-sm">{m.content}</p>
+                <div className="flex items-center justify-end mt-2 space-x-1"><Clock className="w-3 h-3 opacity-50" /><span className="text-xs opacity-75">{m.ts ? new Date(m.ts).toLocaleTimeString() : ""}</span></div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Input Area */}
         <div className="space-y-3 p-4 bg-muted/20 rounded-lg">
           <div>
-            <label className="text-sm font-medium text-foreground mb-2 block">
-              Customer Phone Number
-            </label>
-            <Input
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="+1234567890"
-              className="bg-background"
-            />
+            <label className="text-sm font-medium block">Customer Phone Number</label>
+            <Input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="+1234567890" className="bg-background" />
           </div>
-          
           <div>
-            <label className="text-sm font-medium text-foreground mb-2 block">
-              Message Content
-            </label>
+            <label className="text-sm font-medium block">Message</label>
             <div className="flex space-x-2">
-              <Textarea
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                placeholder="Type your message here..."
-                className="flex-1 bg-background min-h-[60px]"
-                onKeyPress={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                  }
-                }}
-              />
-              <Button
-                onClick={sendMessage}
-                disabled={!messageText.trim() || !customerPhone.trim()}
-                className="bg-gradient-primary hover:opacity-90 self-end"
-              >
+              <Textarea value={messageText} onChange={(e) => setMessageText(e.target.value)} placeholder="Type your message…" className="flex-1 bg-background min-h-[60px]" />
+              <Button onClick={() => sendMut.mutate()} disabled={!messageText.trim() || !customerPhone.trim() || sendMut.isPending} className="bg-gradient-primary self-end">
                 <Send className="w-4 h-4" />
               </Button>
             </div>
