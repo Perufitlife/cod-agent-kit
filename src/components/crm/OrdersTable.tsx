@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import useRealtimeOrders from "@/hooks/useRealtimeOrders";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -8,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "./StatusBadge";
-import { Search, Plus, Filter } from "lucide-react";
+import { OrderDetailModal } from "@/components/orders/OrderDetailModal";
+import { Search, Plus, Filter, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 type OrderRow = {
@@ -58,14 +60,19 @@ async function createDemoOrder() {
 export const OrdersTable = () => {
   console.log("OrdersTable rendering");
   
+  // Use real-time updates
+  useRealtimeOrders();
+  
   const qc = useQueryClient();
   const { data: orders = [], isLoading, error } = useQuery({ 
     queryKey: ["orders"], 
     queryFn: fetchOrders,
-    retry: false
+    retry: false,
+    refetchInterval: 30000 // Poll every 30 seconds as backup
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   const createMut = useMutation({ 
     mutationFn: createDemoOrder, 
@@ -133,7 +140,7 @@ export const OrdersTable = () => {
                   <TableHead className="font-semibold">Customer</TableHead>
                   <TableHead className="font-semibold">Status</TableHead>
                   <TableHead className="font-semibold">Created</TableHead>
-                  <TableHead className="font-semibold">Flags</TableHead>
+                  <TableHead className="font-semibold">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -155,7 +162,20 @@ export const OrdersTable = () => {
                       </TableCell>
                       <TableCell><StatusBadge status={(o.status || "pending")} /></TableCell>
                       <TableCell className="text-muted-foreground">{o.created_at ? new Date(o.created_at).toLocaleString() : "-"}</TableCell>
-                      <TableCell>{o.needs_attention ? <Badge variant="destructive">Needs Attention</Badge> : null}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          {o.needs_attention ? <Badge variant="destructive">Needs Attention</Badge> : null}
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setSelectedOrderId(o.id)}
+                            className="h-8"
+                          >
+                            <Eye className="w-3 h-3 mr-1" />
+                            View
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -164,6 +184,13 @@ export const OrdersTable = () => {
           </div>
         )}
       </CardContent>
+
+      {/* Order Detail Modal */}
+      <OrderDetailModal 
+        orderId={selectedOrderId}
+        isOpen={!!selectedOrderId}
+        onClose={() => setSelectedOrderId(null)}
+      />
     </Card>
   );
 };
