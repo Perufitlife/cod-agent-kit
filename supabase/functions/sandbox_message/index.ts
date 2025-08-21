@@ -193,7 +193,16 @@ Deno.serve(async (req) => {
           // Iniciar workflow de confirmación si existe
           await initiateWorkflow(tenant_id, specificOrder.id, conversation_id, "order_confirmed");
           
-          return new Response(JSON.stringify({ ok: true, conversation_id, action: "order_confirmed", order_id: specificOrder.id }), {
+          return new Response(JSON.stringify({ 
+            ok: true, 
+            conversation_id, 
+            action: "order_confirmed", 
+            order_id: specificOrder.id,
+            intent,
+            confidence,
+            entities,
+            ai_used: !!tenantSettings?.openai_api_key_encrypted
+          }), {
             headers: { ...corsHeaders, "content-type": "application/json" },
           });
         }
@@ -328,7 +337,14 @@ Deno.serve(async (req) => {
       }
     });
 
-    return new Response(JSON.stringify({ ok: true, conversation_id }), {
+    return new Response(JSON.stringify({ 
+      ok: true, 
+      conversation_id,
+      intent,
+      confidence,
+      entities,
+      ai_used: !!tenantSettings?.openai_api_key_encrypted
+    }), {
       headers: { ...corsHeaders, "content-type": "application/json" },
     });
   } catch (e) {

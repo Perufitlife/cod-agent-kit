@@ -425,18 +425,49 @@ const NotificationTest = () => {
                     {sendMessageMut.isPending ? "Enviando..." : "Enviar Mensaje de Test"}
                   </Button>
                   
-                  {lastResponse && (
-                    <div className="p-4 bg-muted/30 rounded-lg space-y-2">
-                      <h4 className="font-medium">Último Resultado:</h4>
-                      <div className="text-sm space-y-1">
-                        <div>Intent detectado: <Badge>{lastResponse.intent || 'N/A'}</Badge></div>
-                        <div>Confianza: <Badge variant="outline">{lastResponse.confidence || 'N/A'}</Badge></div>
-                        <div>Procesado por: <Badge variant={hasApiKey ? "default" : "secondary"}>
-                          {hasApiKey ? "OpenAI + Reglas" : "Solo Reglas"}
-                        </Badge></div>
-                      </div>
-                    </div>
-                  )}
+                   {lastResponse && (
+                     <div className="p-4 bg-muted/30 rounded-lg space-y-3">
+                       <h4 className="font-medium">Último Resultado:</h4>
+                       <div className="grid grid-cols-2 gap-3 text-sm">
+                         <div>
+                           <span className="text-muted-foreground">Intent:</span>
+                           <Badge className="ml-2">{lastResponse.intent || 'N/A'}</Badge>
+                         </div>
+                         <div>
+                           <span className="text-muted-foreground">Confianza:</span>
+                           <Badge variant="outline" className="ml-2">{(lastResponse.confidence * 100).toFixed(0)}%</Badge>
+                         </div>
+                         <div>
+                           <span className="text-muted-foreground">Procesado por:</span>
+                           <Badge variant={lastResponse.ai_used ? "default" : "secondary"} className="ml-2">
+                             {lastResponse.ai_used ? "OpenAI" : "Reglas"}
+                           </Badge>
+                         </div>
+                         <div>
+                           <span className="text-muted-foreground">Conversación:</span>
+                           <Badge variant="outline" className="ml-2">{lastResponse.conversation_id?.slice(0, 8)}...</Badge>
+                         </div>
+                       </div>
+                       {lastResponse.entities && Object.keys(lastResponse.entities).length > 0 && (
+                         <div>
+                           <span className="text-sm text-muted-foreground">Entidades Extraídas:</span>
+                           <div className="flex flex-wrap gap-1 mt-1">
+                             {Object.entries(lastResponse.entities).map(([key, value]) => (
+                               value && <Badge key={key} variant="secondary" className="text-xs">
+                                 {key}: {String(value)}
+                               </Badge>
+                             ))}
+                           </div>
+                         </div>
+                       )}
+                       {lastResponse.action && (
+                         <div>
+                           <span className="text-sm text-muted-foreground">Acción:</span>
+                           <Badge className="ml-2">{lastResponse.action}</Badge>
+                         </div>
+                       )}
+                     </div>
+                   )}
                 </CardContent>
               </Card>
             </div>
