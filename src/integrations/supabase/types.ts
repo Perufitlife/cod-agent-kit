@@ -1061,6 +1061,30 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      get_daily_analytics: {
+        Args: { end_date?: string; start_date?: string }
+        Returns: {
+          cancelled_orders: number
+          confirmed_orders: number
+          date: string
+          pending_orders: number
+          tenant_id: string
+          total_orders: number
+          total_revenue: number
+        }[]
+      }
+      get_user_permissions: {
+        Args: { user_uuid: string }
+        Returns: {
+          action: string
+          permission_name: string
+          resource: string
+        }[]
+      }
       has_permission: {
         Args: { permission_name: string; tenant_id?: string; user_id: string }
         Returns: boolean
