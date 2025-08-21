@@ -124,7 +124,7 @@
 
 @layer base {
   * {
-    @apply border-border transition-smooth;
+    @apply border-border transition-all duration-300 ease-out;
   }
 
   body {
