@@ -131,8 +131,30 @@ const EcommerceFlow = () => {
     mutationFn: async () => {
       const response = await supabase.functions.invoke("create_order", {
         body: { 
-          customer_phone: customerPhone,
-          test_mode: true 
+          data: {
+            name: "Juan Pérez",
+            address: "Av. Javier Prado 1234",
+            city: "Lima",
+            province: "Lima",
+            country: "Perú",
+            customer_phone: customerPhone,
+            products: [
+              {
+                product_name: "iPhone 15 Pro Max 256GB",
+                quantity: 1,
+                unit_price: 5299.00
+              },
+              {
+                product_name: "Funda Silicone Case",
+                quantity: 1,
+                unit_price: 149.00
+              }
+            ],
+            total: 5448.00,
+            notes: "Entrega preferencial en horario de oficina"
+          },
+          source: "demo_test",
+          external_order_id: `DEMO-${Date.now()}`
         }
       });
       if (response.error) throw response.error;
