@@ -1,72 +1,113 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Package, Users, MessageSquare, DollarSign, Zap, Target } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
-const statsData = [
-  {
-    title: "Total Orders",
-    value: "2,847",
-    change: "+12.5%",
-    changeType: "increase" as const,
-    icon: Package,
-    description: "vs last month",
-    color: "bg-gradient-to-br from-blue-500 to-blue-600",
-    glowColor: "shadow-blue-500/25"
-  },
-  {
-    title: "Revenue",
-    value: "$48,392",
-    change: "+8.2%",
-    changeType: "increase" as const,
-    icon: DollarSign,
-    description: "vs last month",
-    color: "bg-gradient-to-br from-emerald-500 to-emerald-600",
-    glowColor: "shadow-emerald-500/25"
-  },
-  {
-    title: "Active Conversations",
-    value: "156",
-    change: "-3.1%",
-    changeType: "decrease" as const,
-    icon: MessageSquare,
-    description: "vs yesterday",
-    color: "bg-gradient-to-br from-purple-500 to-purple-600",
-    glowColor: "shadow-purple-500/25"
-  },
-  {
-    title: "Conversion Rate",
-    value: "94.2%",
-    change: "+2.4%",
-    changeType: "increase" as const,
-    icon: Target,
-    description: "vs last week",
-    color: "bg-gradient-to-br from-amber-500 to-amber-600",
-    glowColor: "shadow-amber-500/25"
-  },
-  {
-    title: "AI Response Time",
-    value: "1.2s",
-    change: "-15.3%",
-    changeType: "increase" as const,
-    icon: Zap,
-    description: "vs last hour",
-    color: "bg-gradient-to-br from-rose-500 to-rose-600",
-    glowColor: "shadow-rose-500/25"
-  },
-  {
-    title: "Active Users",
-    value: "8,429",
-    change: "+18.7%",
-    changeType: "increase" as const,
-    icon: Users,
-    description: "vs last month",
-    color: "bg-gradient-to-br from-indigo-500 to-indigo-600",
-    glowColor: "shadow-indigo-500/25"
-  }
-];
+const fetchStats = async () => {
+  // Get user's tenant_id from user_tenants table
+  const { data: userTenantData } = await supabase
+    .from("user_tenants")
+    .select("tenant_id")
+    .single();
+  
+  if (!userTenantData) throw new Error("No tenant found for user");
+  
+  const tenantId = userTenantData.tenant_id;
+
+  // Fetch orders count
+  const { count: ordersCount } = await supabase
+    .from("orders")
+    .select("*", { count: "exact", head: true })
+    .eq("tenant_id", tenantId);
+
+  // Fetch total revenue from orders
+  const { data: ordersData } = await supabase
+    .from("orders")
+    .select("data")
+    .eq("tenant_id", tenantId);
+
+  const totalRevenue = ordersData?.reduce((sum, order) => {
+    // Safely access the total property from the JSON data
+    const orderData = order.data as any;
+    const total = orderData?.total || 0;
+    return sum + (typeof total === "string" ? parseFloat(total) || 0 : total);
+  }, 0) || 0;
+
+  // Fetch conversations count
+  const { count: conversationsCount } = await supabase
+    .from("conversations")
+    .select("*", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .eq("status", "active");
+
+  // Fetch confirmed orders for conversion rate
+  const { count: confirmedOrdersCount } = await supabase
+    .from("orders")
+    .select("*", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .eq("status", "confirmed");
+
+  const conversionRate = ordersCount > 0 ? ((confirmedOrdersCount || 0) / ordersCount * 100).toFixed(1) : "0.0";
+
+  return {
+    totalOrders: ordersCount || 0,
+    revenue: totalRevenue,
+    activeConversations: conversationsCount || 0,
+    conversionRate: conversionRate + "%"
+  };
+};
 
 export const StatsCards = () => {
-  console.log("StatsCards rendering");
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ["dashboard-stats"],
+    queryFn: fetchStats,
+  });
+
+  const statsData = [
+    {
+      title: "Total Orders",
+      value: isLoading ? "..." : (stats?.totalOrders.toString() || "0"),
+      change: "--",
+      changeType: "increase" as const,
+      icon: Package,
+      description: "all time",
+      color: "bg-gradient-to-br from-blue-500 to-blue-600",
+      glowColor: "shadow-blue-500/25"
+    },
+    {
+      title: "Revenue",
+      value: isLoading ? "..." : `$${stats?.revenue.toLocaleString() || "0"}`,
+      change: "--",
+      changeType: "increase" as const,
+      icon: DollarSign,
+      description: "all time",
+      color: "bg-gradient-to-br from-emerald-500 to-emerald-600",
+      glowColor: "shadow-emerald-500/25"
+    },
+    {
+      title: "Active Conversations",
+      value: isLoading ? "..." : (stats?.activeConversations.toString() || "0"),
+      change: "--",
+      changeType: "increase" as const,
+      icon: MessageSquare,
+      description: "currently active",
+      color: "bg-gradient-to-br from-purple-500 to-purple-600",
+      glowColor: "shadow-purple-500/25"
+    },
+    {
+      title: "Conversion Rate",
+      value: isLoading ? "..." : (stats?.conversionRate || "0%"),
+      change: "--",
+      changeType: "increase" as const,
+      icon: Target,
+      description: "orders confirmed",
+      color: "bg-gradient-to-br from-amber-500 to-amber-600",
+      glowColor: "shadow-amber-500/25"
+    }
+  ];
+
+  console.log("StatsCards rendering with real data:", stats);
   
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
