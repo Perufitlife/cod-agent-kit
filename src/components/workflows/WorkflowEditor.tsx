@@ -7,19 +7,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Save, Play, ArrowDown, Settings } from "lucide-react";
+import { Plus, Trash2, Save, Play, ArrowDown, Settings, Sparkles } from "lucide-react";
 import { WorkflowTriggerEditor } from "./WorkflowTriggerEditor";
 import { WorkflowFlowViewer } from "./WorkflowFlowViewer";
+import { workflowTemplates } from "./WorkflowTemplates";
 
-type WorkflowAction = {
+export type WorkflowAction = {
   id: string;
   sequence_order: number;
-  action_type: "wait" | "send_message" | "update_order" | "create_timer";
+  action_type: "wait" | "send_message" | "update_order" | "create_timer" | "check_condition" | "ai_agent_decision" | "branch" | "end_workflow";
   config: Record<string, any>;
   conditions?: Record<string, any>;
+  outputs?: { [key: string]: string }; // For branching actions like conditions
 };
 
-type WorkflowDefinition = {
+export type WorkflowDefinition = {
   id?: string;
   name: string;
   description: string;
@@ -155,6 +157,125 @@ export const WorkflowEditor = ({ workflow, onSave, onCancel }: WorkflowEditorPro
             />
           </div>
         );
+
+      case "check_condition":
+        return (
+          <div className="space-y-2">
+            <Label>Condition Type</Label>
+            <Select
+              value={action.config.condition_type || ""}
+              onValueChange={(value) => updateAction(action.id, {
+                config: { ...action.config, condition_type: value }
+              })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select condition" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="has_tag">Has Tag</SelectItem>
+                <SelectItem value="order_status">Order Status</SelectItem>
+                <SelectItem value="time_elapsed">Time Elapsed</SelectItem>
+                <SelectItem value="custom_field">Custom Field</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {action.config.condition_type === "has_tag" && (
+              <>
+                <Label>Tag Name</Label>
+                <Input
+                  value={action.config.tag_name || ""}
+                  onChange={(e) => updateAction(action.id, {
+                    config: { ...action.config, tag_name: e.target.value }
+                  })}
+                  placeholder="e.g., order_linked"
+                />
+              </>
+            )}
+            
+            {action.config.condition_type === "order_status" && (
+              <>
+                <Label>Expected Status</Label>
+                <Select
+                  value={action.config.expected_status || ""}
+                  onValueChange={(value) => updateAction(action.id, {
+                    config: { ...action.config, expected_status: value }
+                  })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="confirmed">Confirmed</SelectItem>
+                    <SelectItem value="processing">Processing</SelectItem>
+                    <SelectItem value="shipped">Shipped</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+          </div>
+        );
+
+      case "ai_agent_decision":
+        return (
+          <div className="space-y-2">
+            <Label>AI Prompt</Label>
+            <Textarea
+              value={action.config.prompt || ""}
+              onChange={(e) => updateAction(action.id, {
+                config: { ...action.config, prompt: e.target.value }
+              })}
+              placeholder="Describe what the AI should analyze and decide..."
+              rows={4}
+            />
+            <Label>Decision Options</Label>
+            <div className="space-y-2">
+              <Input
+                value={action.config.option_1 || ""}
+                onChange={(e) => updateAction(action.id, {
+                  config: { ...action.config, option_1: e.target.value }
+                })}
+                placeholder="Option 1 (e.g., confirm_order)"
+              />
+              <Input
+                value={action.config.option_2 || ""}
+                onChange={(e) => updateAction(action.id, {
+                  config: { ...action.config, option_2: e.target.value }
+                })}
+                placeholder="Option 2 (e.g., reject_order)"
+              />
+            </div>
+          </div>
+        );
+
+      case "branch":
+        return (
+          <div className="space-y-2">
+            <Label>Branch Description</Label>
+            <Input
+              value={action.config.description || ""}
+              onChange={(e) => updateAction(action.id, {
+                config: { ...action.config, description: e.target.value }
+              })}
+              placeholder="Describe this branch point..."
+            />
+          </div>
+        );
+
+      case "end_workflow":
+        return (
+          <div className="space-y-2">
+            <Label>End Reason</Label>
+            <Input
+              value={action.config.reason || ""}
+              onChange={(e) => updateAction(action.id, {
+                config: { ...action.config, reason: e.target.value }
+              })}
+              placeholder="Why does the workflow end here?"
+            />
+          </div>
+        );
         
       default:
         return null;
@@ -222,10 +343,30 @@ export const WorkflowEditor = ({ workflow, onSave, onCancel }: WorkflowEditorPro
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">Workflow Actions</h3>
-            <Button onClick={addAction} variant="outline" size="sm">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Action
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => {
+                  const template = workflowTemplates.order_processing;
+                  setFormData(prev => ({
+                    ...prev,
+                    name: prev.name || template.name,
+                    description: prev.description || template.description,
+                    actions: template.actions,
+                    triggers: template.triggers
+                  }));
+                }}
+                variant="outline" 
+                size="sm"
+                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 hover:from-purple-600 hover:to-pink-600"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Use AI Template
+              </Button>
+              <Button onClick={addAction} variant="outline" size="sm">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Action
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -250,6 +391,10 @@ export const WorkflowEditor = ({ workflow, onSave, onCancel }: WorkflowEditorPro
                           <SelectItem value="send_message">Send Message</SelectItem>
                           <SelectItem value="update_order">Update Order</SelectItem>
                           <SelectItem value="create_timer">Create Timer</SelectItem>
+                          <SelectItem value="check_condition">Check Condition</SelectItem>
+                          <SelectItem value="ai_agent_decision">AI Agent Decision</SelectItem>
+                          <SelectItem value="branch">Branch Point</SelectItem>
+                          <SelectItem value="end_workflow">End Workflow</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

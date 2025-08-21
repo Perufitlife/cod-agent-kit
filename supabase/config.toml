@@ -9,7 +9,7 @@ verify_jwt = false
 verify_jwt = false
 [functions.sandbox_message]
 verify_jwt = false
-[functions.timers_fire]
+[functions.process_workflow_action]
 verify_jwt = false
 [functions.agent_intent]
 verify_jwt = false

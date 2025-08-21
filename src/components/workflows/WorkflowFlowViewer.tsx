@@ -51,6 +51,7 @@ const createNodesFromDefinition = (definition: any): { nodes: Node[], edges: Edg
     let nodeLabel = '';
     let nodeColor = '#f3f4f6';
     let borderColor = '#6b7280';
+    let nodeType = 'default';
 
     switch (action.action_type) {
       case 'wait':
@@ -73,34 +74,81 @@ const createNodesFromDefinition = (definition: any): { nodes: Node[], edges: Edg
         nodeColor = '#fce7f3';
         borderColor = '#ec4899';
         break;
+      case 'check_condition':
+        nodeLabel = action.config?.condition_type === 'has_tag' 
+          ? `Has Tag: ${action.config?.tag_name || '?'}` 
+          : `Check: ${action.config?.condition_type || 'Unknown'}`;
+        nodeColor = '#fbbf24';
+        borderColor = '#f59e0b';
+        nodeType = 'default'; // Could be a diamond shape for conditions
+        break;
+      case 'ai_agent_decision':
+        nodeLabel = `AI Decision`;
+        nodeColor = '#c084fc';
+        borderColor = '#9333ea';
+        break;
+      case 'branch':
+        nodeLabel = `Branch: ${action.config?.description || 'Split'}`;
+        nodeColor = '#fb7185';
+        borderColor = '#e11d48';
+        break;
+      case 'end_workflow':
+        nodeLabel = `End: ${action.config?.reason || 'Complete'}`;
+        nodeColor = '#fee2e2';
+        borderColor = '#dc2626';
+        break;
       default:
         nodeLabel = action.action_type;
     }
 
+    // Special styling for conditional nodes
+    const isConditional = action.action_type === 'check_condition' || action.action_type === 'ai_agent_decision';
+    const nodeStyle = {
+      background: nodeColor,
+      border: `2px solid ${borderColor}`,
+      ...(isConditional && {
+        borderRadius: '0', // Make it diamond-like
+        transform: 'rotate(45deg)',
+        width: '100px',
+        height: '100px',
+      })
+    };
+
     nodes.push({
       id: nodeId,
-      type: 'default',
+      type: nodeType,
       position: { x: 100, y: 150 + (index * 120) },
       data: { 
         label: (
-          <div className="text-center">
-            <div className="font-medium">{nodeLabel}</div>
+          <div className="text-center" style={isConditional ? { transform: 'rotate(-45deg)' } : {}}>
+            <div className="font-medium text-xs">{nodeLabel}</div>
             <Badge variant="outline" className="text-xs mt-1">
               Step {action.sequence_order}
             </Badge>
           </div>
         )
       },
-      style: { background: nodeColor, border: `2px solid ${borderColor}` }
+      style: nodeStyle
     });
 
-    // Create edge from previous node
+    // Create edge from previous node with labels for conditional flows
     const sourceId = index === 0 ? 'start' : `action-${index - 1}`;
+    const prevAction = index > 0 ? definition.actions[index - 1] : null;
+    
+    // Add edge labels for conditional flows
+    let edgeLabel = '';
+    if (prevAction && (prevAction.action_type === 'check_condition' || prevAction.action_type === 'ai_agent_decision')) {
+      edgeLabel = 'YES'; // Default to YES path
+    }
+
     edges.push({
       id: `edge-${sourceId}-${nodeId}`,
       source: sourceId,
       target: nodeId,
-      type: 'smoothstep'
+      type: 'smoothstep',
+      label: edgeLabel,
+      labelStyle: { fill: '#666', fontWeight: 600 },
+      labelBgStyle: { fill: '#fff', fillOpacity: 0.8 }
     });
   });
 
