@@ -631,6 +631,39 @@ export type Database = {
         }
         Relationships: []
       }
+      workflow_actions: {
+        Row: {
+          action_type: string
+          conditions: Json | null
+          config: Json
+          created_at: string | null
+          id: string
+          sequence_order: number
+          tenant_id: string
+          workflow_version_id: string
+        }
+        Insert: {
+          action_type: string
+          conditions?: Json | null
+          config?: Json
+          created_at?: string | null
+          id?: string
+          sequence_order: number
+          tenant_id: string
+          workflow_version_id: string
+        }
+        Update: {
+          action_type?: string
+          conditions?: Json | null
+          config?: Json
+          created_at?: string | null
+          id?: string
+          sequence_order?: number
+          tenant_id?: string
+          workflow_version_id?: string
+        }
+        Relationships: []
+      }
       workflow_definitions: {
         Row: {
           created_at: string | null
@@ -732,6 +765,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      workflow_triggers: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          tenant_id: string
+          trigger_config: Json | null
+          trigger_type: string
+          workflow_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          tenant_id: string
+          trigger_config?: Json | null
+          trigger_type: string
+          workflow_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          tenant_id?: string
+          trigger_config?: Json | null
+          trigger_type?: string
+          workflow_id?: string
+        }
+        Relationships: []
       }
       workflow_versions: {
         Row: {

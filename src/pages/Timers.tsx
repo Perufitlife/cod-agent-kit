@@ -1,11 +1,17 @@
+import { useEffect } from "react";
 import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Timer, Clock, CheckCircle, AlertTriangle } from "lucide-react";
+import { Timer, Clock, CheckCircle, AlertTriangle, Play, Pause, RefreshCw } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const Timers = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
   const { data: timers, isLoading } = useQuery({
     queryKey: ['timers'],
     queryFn: async () => {
@@ -16,6 +22,47 @@ const Timers = () => {
       
       if (error) throw error;
       return data;
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds for real-time monitoring
+  });
+
+  // Set up real-time updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('timers-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'timers'
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ['timers'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  const manualProcessTimersMutation = useMutation({
+    mutationFn: async () => {
+      const response = await supabase.functions.invoke('process_timers');
+      if (response.error) throw response.error;
+      return response.data;
+    },
+    onSuccess: (data) => {
+      toast({ 
+        title: "Timers processed", 
+        description: `Processed ${data?.processed || 0} out of ${data?.found || 0} timers` 
+      });
+      queryClient.invalidateQueries({ queryKey: ['timers'] });
+    },
+    onError: (error) => {
+      toast({ 
+        title: "Failed to process timers", 
+        description: error.message, 
+        variant: "destructive" 
+      });
     }
   });
 
@@ -58,6 +105,15 @@ const Timers = () => {
               Monitor scheduled actions and automated timers
             </p>
           </div>
+          <Button 
+            onClick={() => manualProcessTimersMutation.mutate()}
+            disabled={manualProcessTimersMutation.isPending}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${manualProcessTimersMutation.isPending ? 'animate-spin' : ''}`} />
+            Process Timers Now
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -119,40 +175,48 @@ const Timers = () => {
             {isLoading ? (
               <div className="text-center py-4">Loading timers...</div>
             ) : timers && timers.length > 0 ? (
-              <div className="space-y-4">
-                {timers.map((timer) => (
-                  <div key={timer.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      {getStatusIcon(timer.status)}
-                      <div>
-                        <p className="font-medium">{timer.purpose}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Fire at: {new Date(timer.fire_at).toLocaleString()}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Created: {new Date(timer.created_at).toLocaleString()}
-                        </p>
+                <div className="space-y-4">
+                  {timers.map((timer) => (
+                    <div key={timer.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center gap-3">
+                        {getStatusIcon(timer.status)}
+                        <div>
+                          <p className="font-medium">{timer.purpose}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Fire at: {new Date(timer.fire_at).toLocaleString()}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Created: {new Date(timer.created_at).toLocaleString()}
+                          </p>
+                          {timer.fired_at && (
+                            <p className="text-xs text-muted-foreground">
+                              Fired: {new Date(timer.fired_at).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {timer.status === 'scheduled' && (
+                          <div className="text-right">
+                            <span className="text-sm font-medium text-muted-foreground">
+                              {formatTimeRemaining(timer.fire_at)}
+                            </span>
+                            <p className="text-xs text-muted-foreground">remaining</p>
+                          </div>
+                        )}
+                        <Badge 
+                          variant={
+                            timer.status === 'fired' ? 'default' : 
+                            timer.status === 'scheduled' ? 'secondary' : 
+                            'destructive'
+                          }
+                        >
+                          {timer.status}
+                        </Badge>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      {timer.status === 'scheduled' && (
-                        <span className="text-sm text-muted-foreground">
-                          {formatTimeRemaining(timer.fire_at)}
-                        </span>
-                      )}
-                      <Badge 
-                        variant={
-                          timer.status === 'fired' ? 'default' : 
-                          timer.status === 'scheduled' ? 'secondary' : 
-                          'destructive'
-                        }
-                      >
-                        {timer.status}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <Timer className="w-12 h-12 mx-auto mb-4 opacity-50" />

@@ -13,6 +13,8 @@ verify_jwt = false
 verify_jwt = false
 [functions.agent_intent]
 verify_jwt = false
+[functions.process_timers]
+verify_jwt = false
 
 [env]
 APP_ENCRYPTION_KEY = "change-this-32bytes-minimo"
