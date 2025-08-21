@@ -10,7 +10,8 @@ import {
   Timer,
   BarChart3,
   Users,
-  Plug
+  Plug,
+  Sparkles
 } from "lucide-react";
 
 interface DashboardLayoutProps {
@@ -34,26 +35,35 @@ export const DashboardLayout = ({ children, currentPage = "dashboard" }: Dashboa
   console.log("DashboardLayout rendering with page:", currentPage);
   
   return (
-    <div className="min-h-screen bg-background">
-      {/* Sidebar */}
-      <div className="fixed inset-y-0 left-0 z-50 w-64 bg-card shadow-medium border-r border-border">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      {/* Enhanced Sidebar with Glass Effect */}
+      <div className="fixed inset-y-0 left-0 z-50 w-72 bg-sidebar/95 backdrop-blur-xl shadow-strong border-r border-sidebar-border">
         <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="flex items-center justify-between h-16 px-6 border-b border-border bg-gradient-primary">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                <Package className="w-5 h-5 text-white" />
+          {/* Enhanced Logo Section */}
+          <div className="relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-primary opacity-90"></div>
+            <div className="relative flex items-center justify-between h-20 px-6 border-b border-white/10">
+              <div className="flex items-center space-x-4">
+                <div className="relative">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                    <Sparkles className="w-6 h-6 text-white animate-pulse-glow" />
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-success rounded-full animate-pulse"></div>
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white tracking-tight">Order CRM</h1>
+                  <p className="text-xs text-white/80 font-medium">AI-Powered Platform</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-lg font-semibold text-white">Order CRM</h1>
-                <p className="text-xs text-white/80">AI-Powered</p>
-              </div>
+              <NotificationCenter />
             </div>
-            <NotificationCenter />
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-1">
+          {/* Enhanced Navigation */}
+          <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            <div className="text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider mb-4 px-3">
+              Navigation
+            </div>
             {navigation.map((item) => {
               const isActive = currentPage === item.page;
               return (
@@ -61,34 +71,57 @@ export const DashboardLayout = ({ children, currentPage = "dashboard" }: Dashboa
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    "flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200",
+                    "group flex items-center px-4 py-3.5 text-sm font-medium rounded-xl transition-all duration-300 relative overflow-hidden",
                     isActive
-                      ? "bg-primary text-primary-foreground shadow-soft"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      ? "bg-gradient-to-r from-primary to-primary-glow text-white shadow-lg shadow-primary/25 scale-[1.02]"
+                      : "text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 hover:scale-[1.01]"
                   )}
                 >
-                  <item.icon className="w-5 h-5 mr-3 flex-shrink-0" />
+                  {/* Active indicator */}
+                  {isActive && (
+                    <div className="absolute left-0 top-0 w-1 h-full bg-white rounded-r-full"></div>
+                  )}
+                  
+                  {/* Icon with enhanced styling */}
+                  <div className={cn(
+                    "flex items-center justify-center w-8 h-8 rounded-lg mr-3 transition-all duration-300",
+                    isActive 
+                      ? "bg-white/20 shadow-sm" 
+                      : "bg-sidebar-accent/30 group-hover:bg-sidebar-accent group-hover:scale-110"
+                  )}>
+                    <item.icon className="w-4 h-4 flex-shrink-0" />
+                  </div>
+                  
                   <span className="truncate">{item.name}</span>
+                  
+                  {/* Hover glow effect */}
+                  {!isActive && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl"></div>
+                  )}
                 </a>
               );
             })}
           </nav>
 
-          {/* Status Indicator */}
-          <div className="px-6 py-4 border-t border-border bg-muted/30">
+          {/* Enhanced Status Section */}
+          <div className="px-6 py-4 border-t border-sidebar-border bg-sidebar-accent/30 backdrop-blur-sm">
             <div className="flex items-center space-x-3">
-              <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground">AI Agent Active</p>
-                <p className="text-xs text-muted-foreground truncate">Processing messages...</p>
+              <div className="relative">
+                <div className="w-3 h-3 bg-success rounded-full animate-pulse"></div>
+                <div className="absolute inset-0 w-3 h-3 bg-success rounded-full animate-ping"></div>
               </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-sidebar-foreground">AI Agent Online</p>
+                <p className="text-xs text-sidebar-foreground/70 truncate">Processing 24 conversations...</p>
+              </div>
+              <div className="w-2 h-8 bg-gradient-to-t from-success via-success to-success/50 rounded-full"></div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="ml-64 min-h-screen">
+      {/* Main Content with Enhanced Spacing */}
+      <div className="ml-72 min-h-screen">
         <main className="w-full min-h-screen">
           {children}
         </main>
