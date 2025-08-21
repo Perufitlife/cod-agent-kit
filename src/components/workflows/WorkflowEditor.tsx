@@ -226,146 +226,142 @@ export const WorkflowEditor = ({ workflow, onSave, onCancel }: WorkflowEditorPro
           {workflow ? "Edit Workflow" : "Create New Workflow"}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Basic Info */}
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="name">Workflow Name</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="Enter workflow name..."
-            />
+      <CardContent className="space-y-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column: Basic Info + Template */}
+          <div className="space-y-6">
+            <div>
+              <Label htmlFor="name">Workflow Name</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter workflow name..."
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Describe what this workflow does..."
+                rows={2}
+              />
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="active"
+                checked={formData.is_active}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
+              />
+              <Label htmlFor="active">Active</Label>
+            </div>
           </div>
-          
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Describe what this workflow does..."
-              rows={2}
-            />
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="active"
-              checked={formData.is_active}
-              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
-            />
-            <Label htmlFor="active">Active</Label>
+
+          {/* Right Column: Actions */}
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200 mb-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-blue-900 mb-1">🚀 Flujo de Procesamiento de Órdenes</h3>
+                  <p className="text-sm text-blue-700">Usa el template inteligente o crea acciones personalizadas</p>
+                </div>
+                <Button 
+                  onClick={() => {
+                    const template = workflowTemplates.order_processing;
+                    setFormData(prev => ({
+                      ...prev,
+                      name: template.name,
+                      description: template.description,
+                      actions: template.actions,
+                      triggers: template.triggers
+                    }));
+                  }}
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 hover:from-purple-600 hover:to-pink-600 shadow-lg"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Usar Template IA
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium text-gray-800">Acciones del Flujo</h4>
+              <Button onClick={addAction} variant="outline" size="sm">
+                <Plus className="w-4 h-4 mr-2" />
+                Agregar Acción
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              {formData.actions.map((action, index) => (
+                <Card key={action.id} className="border-l-4 border-l-primary">
+                  <CardContent className="p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">Step {action.sequence_order}</Badge>
+                        <Select
+                          value={action.action_type}
+                          onValueChange={(value) => updateAction(action.id, {
+                            action_type: value as WorkflowAction["action_type"],
+                            config: {} // Reset config when type changes
+                          })}
+                        >
+                          <SelectTrigger className="w-48">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="wait">⏱️ Esperar</SelectItem>
+                            <SelectItem value="send_message">💬 Enviar Mensaje</SelectItem>
+                            <SelectItem value="update_order">📋 Actualizar Orden</SelectItem>
+                            <SelectItem value="check_condition">❓ Verificar Condición</SelectItem>
+                            <SelectItem value="ai_agent_decision">🤖 Decisión IA</SelectItem>
+                            <SelectItem value="end_workflow">🛑 Terminar Flujo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button
+                        onClick={() => removeAction(action.id)}
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+
+                    {renderActionConfig(action)}
+
+                    {index < formData.actions.length - 1 && (
+                      <div className="flex justify-center">
+                        <ArrowDown className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+
+              {formData.actions.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
+                  <Play className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>No hay acciones configuradas</p>
+                  <p className="text-sm">Usa el Template IA o agrega acciones manualmente</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Triggers */}
-        <WorkflowTriggerEditor
-          triggers={formData.triggers}
-          onTriggersChange={(triggers) => setFormData(prev => ({ ...prev, triggers }))}
-        />
-
-        {/* Visual Flow Preview */}
+        {/* Full Width Flow Visualization */}
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Workflow Flow Preview</h3>
+          <h3 className="text-lg font-semibold text-center">🔄 Visualización del Flujo Completo</h3>
           <WorkflowFlowViewer 
             workflowDefinition={{ actions: formData.actions }}
             isEditable={false}
           />
-        </div>
-
-        {/* Actions */}
-        <div className="space-y-4">
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200 mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-blue-900 mb-1">🚀 Flujo de Procesamiento de Órdenes</h3>
-                <p className="text-sm text-blue-700">Usa el template inteligente o crea acciones personalizadas</p>
-              </div>
-              <Button 
-                onClick={() => {
-                  const template = workflowTemplates.order_processing;
-                  setFormData(prev => ({
-                    ...prev,
-                    name: template.name,
-                    description: template.description,
-                    actions: template.actions,
-                    triggers: template.triggers
-                  }));
-                }}
-                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 hover:from-purple-600 hover:to-pink-600 shadow-lg"
-              >
-                <Sparkles className="w-4 h-4 mr-2" />
-                Usar Template IA
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <h4 className="font-medium text-gray-800">Acciones del Flujo</h4>
-            <Button onClick={addAction} variant="outline" size="sm">
-              <Plus className="w-4 h-4 mr-2" />
-              Agregar Acción
-            </Button>
-          </div>
-
-          <div className="space-y-4">
-            {formData.actions.map((action, index) => (
-              <Card key={action.id} className="border-l-4 border-l-primary">
-                <CardContent className="p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">Step {action.sequence_order}</Badge>
-                      <Select
-                        value={action.action_type}
-                        onValueChange={(value) => updateAction(action.id, {
-                          action_type: value as WorkflowAction["action_type"],
-                          config: {} // Reset config when type changes
-                        })}
-                      >
-                        <SelectTrigger className="w-48">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="wait">⏱️ Esperar</SelectItem>
-                          <SelectItem value="send_message">💬 Enviar Mensaje</SelectItem>
-                          <SelectItem value="update_order">📋 Actualizar Orden</SelectItem>
-                          <SelectItem value="check_condition">❓ Verificar Condición</SelectItem>
-                          <SelectItem value="ai_agent_decision">🤖 Decisión IA</SelectItem>
-                          <SelectItem value="end_workflow">🛑 Terminar Flujo</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button
-                      onClick={() => removeAction(action.id)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-
-                  {renderActionConfig(action)}
-
-                  {index < formData.actions.length - 1 && (
-                    <div className="flex justify-center">
-                      <ArrowDown className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-
-            {formData.actions.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
-                <Play className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>No actions yet</p>
-                <p className="text-sm">Add actions to define your workflow</p>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Actions */}
