@@ -150,7 +150,7 @@ export const NotificationCenter = () => {
       const rect = buttonRef.current.getBoundingClientRect();
       setButtonPosition({
         top: rect.bottom + 8,
-        right: window.innerWidth - rect.right
+        right: Math.max(16, window.innerWidth - rect.right - 16) // Más hacia la derecha con margen mínimo
       });
     }
   }, [isOpen]);
