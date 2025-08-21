@@ -76,7 +76,10 @@ export const OrdersTable = () => {
 
   const createMut = useMutation({ 
     mutationFn: createDemoOrder, 
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["orders"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    },
     onError: (error) => console.error("Create order error:", error)
   });
 
