@@ -133,14 +133,14 @@ export const WorkflowTriggerEditor = ({ triggers = [], onTriggersChange }: Workf
                 <div>
                   <Label>Status Filter</Label>
                   <Select
-                    value={trigger.conditions?.status || ""}
-                    onValueChange={(value) => updateTriggerCondition(trigger.id, 'status', value)}
+                    value={trigger.conditions?.status || "any"}
+                    onValueChange={(value) => updateTriggerCondition(trigger.id, 'status', value === "any" ? undefined : value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Any status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Any Status</SelectItem>
+                      <SelectItem value="any">Any Status</SelectItem>
                       <SelectItem value="pending">Pending</SelectItem>
                       <SelectItem value="confirmed">Confirmed</SelectItem>
                       <SelectItem value="processing">Processing</SelectItem>
