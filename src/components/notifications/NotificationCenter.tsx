@@ -171,7 +171,7 @@ export const NotificationCenter = () => {
       </Button>
 
       {isOpen && (
-        <Card className="absolute right-0 top-full mt-2 w-96 max-h-96 z-[100] shadow-2xl bg-background border">
+        <Card className="fixed top-20 right-6 w-96 max-h-96 z-[9999] shadow-2xl bg-background border">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm">Notifications</CardTitle>
