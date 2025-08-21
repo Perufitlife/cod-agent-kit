@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Orders from "./pages/Orders";
 import Conversations from "./pages/Conversations";
 import NotificationTest from "./pages/NotificationTest";
+import EcommerceFlow from "./pages/EcommerceFlow";
 import Workflows from "./pages/Workflows";
 import Timers from "./pages/Timers";
 import Analytics from "./pages/Analytics";
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
             <Route path="/conversations" element={<ProtectedRoute><Conversations /></ProtectedRoute>} />
             <Route path="/notification-test" element={<ProtectedRoute><NotificationTest /></ProtectedRoute>} />
+            <Route path="/ecommerce-flow" element={<ProtectedRoute><EcommerceFlow /></ProtectedRoute>} />
             <Route path="/workflows" element={<ProtectedRoute><Workflows /></ProtectedRoute>} />
             <Route path="/timers" element={<ProtectedRoute><Timers /></ProtectedRoute>} />
             <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
