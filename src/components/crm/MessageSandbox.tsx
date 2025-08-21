@@ -57,12 +57,7 @@ export const MessageSandbox = () => {
   const [conversationId, setConversationId] = useState<string>("");
   const [messageText, setMessageText] = useState("");
 
-  useEffect(() => {
-    (async () => {
-      const id = await ensureConversation(customerPhone);
-      setConversationId(id);
-    })();
-  }, [customerPhone]);
+  // Removed auto-conversation creation - only create when user sends message
 
   const { data, isLoading } = useQuery({
     queryKey: ["thread", conversationId],
@@ -73,11 +68,18 @@ export const MessageSandbox = () => {
 
   const sendMut = useMutation({
     mutationFn: async () => {
+      // Ensure conversation exists before sending message
+      let currentConversationId = conversationId;
+      if (!currentConversationId) {
+        currentConversationId = await ensureConversation(customerPhone);
+        setConversationId(currentConversationId);
+      }
+      
       const { data, error } = await supabase.functions.invoke('sandbox_message', {
         body: { 
           customer_phone: customerPhone, 
           message_text: messageText, 
-          conversation_id: conversationId 
+          conversation_id: currentConversationId 
         }
       });
       
