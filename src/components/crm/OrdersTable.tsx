@@ -53,12 +53,24 @@ async function createDemoOrder() {
 }
 
 export const OrdersTable = () => {
+  console.log("OrdersTable rendering");
+  
   const qc = useQueryClient();
-  const { data: orders = [], isLoading } = useQuery({ queryKey: ["orders"], queryFn: fetchOrders });
+  const { data: orders = [], isLoading, error } = useQuery({ 
+    queryKey: ["orders"], 
+    queryFn: fetchOrders,
+    retry: false
+  });
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const createMut = useMutation({ mutationFn: createDemoOrder, onSuccess: () => qc.invalidateQueries({ queryKey: ["orders"] }) });
+  const createMut = useMutation({ 
+    mutationFn: createDemoOrder, 
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["orders"] }),
+    onError: (error) => console.error("Create order error:", error)
+  });
+
+  console.log("Orders data:", orders, "Loading:", isLoading, "Error:", error);
 
   const filtered = orders.filter(o => {
     const name = o.data?.name?.toString().toLowerCase() || "";
@@ -68,6 +80,10 @@ export const OrdersTable = () => {
     const matchesStatus = statusFilter === "all" || (o.status || "").toLowerCase() === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  if (error) {
+    console.error("Orders query error:", error);
+  }
 
   return (
     <Card className="shadow-medium">
@@ -93,7 +109,19 @@ export const OrdersTable = () => {
       </CardHeader>
 
       <CardContent>
-        {isLoading ? <div className="p-6">Loading…</div> : (
+        {isLoading ? (
+          <div className="p-6 text-center">
+            <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+            <p className="mt-2 text-muted-foreground">Loading orders...</p>
+          </div>
+        ) : error ? (
+          <div className="p-6 text-center">
+            <p className="text-destructive">Error loading orders: {error.message}</p>
+            <Button variant="outline" onClick={() => qc.invalidateQueries({ queryKey: ["orders"] })} className="mt-2">
+              Retry
+            </Button>
+          </div>
+        ) : (
           <div className="rounded-lg border overflow-hidden">
             <Table>
               <TableHeader>
@@ -106,20 +134,28 @@ export const OrdersTable = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((o) => (
-                  <TableRow key={o.id} className="hover:bg-muted/50">
-                    <TableCell className="font-medium">{o.system_order_id}</TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{o.data?.name || "-"}</p>
-                        <p className="text-sm text-muted-foreground">{o.data?.customer_phone || "-"}</p>
-                      </div>
+                {filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      {orders.length === 0 ? "No orders found. Create your first order!" : "No orders match your filters."}
                     </TableCell>
-                    <TableCell><StatusBadge status={(o.status || "pending")} /></TableCell>
-                    <TableCell className="text-muted-foreground">{o.created_at ? new Date(o.created_at).toLocaleString() : "-"}</TableCell>
-                    <TableCell>{o.needs_attention ? <Badge variant="destructive">Needs Attention</Badge> : null}</TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filtered.map((o) => (
+                    <TableRow key={o.id} className="hover:bg-muted/50">
+                      <TableCell className="font-medium">{o.system_order_id}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{o.data?.name || "-"}</p>
+                          <p className="text-sm text-muted-foreground">{o.data?.customer_phone || "-"}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell><StatusBadge status={(o.status || "pending")} /></TableCell>
+                      <TableCell className="text-muted-foreground">{o.created_at ? new Date(o.created_at).toLocaleString() : "-"}</TableCell>
+                      <TableCell>{o.needs_attention ? <Badge variant="destructive">Needs Attention</Badge> : null}</TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

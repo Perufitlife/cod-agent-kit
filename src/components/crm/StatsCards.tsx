@@ -38,14 +38,17 @@ const statsData = [
 ];
 
 export const StatsCards = () => {
+  console.log("StatsCards rendering");
+  
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
       {statsData.map((stat, index) => {
         const Icon = stat.icon;
+        console.log("Rendering stat card:", stat.title);
         
         return (
-          <Card key={index} className="shadow-soft hover:shadow-medium transition-all duration-200 border-0 bg-card/80 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <Card key={index} className="shadow-soft hover:shadow-medium transition-all duration-200 border bg-card">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {stat.title}
               </CardTitle>
@@ -53,7 +56,7 @@ export const StatsCards = () => {
                 <Icon className="h-4 w-4 text-primary" />
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pb-4">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-2xl font-bold text-foreground">{stat.value}</div>
