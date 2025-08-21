@@ -38,17 +38,26 @@ const Workflows = () => {
   });
 
   const { data: workflowRuns, isLoading: runsLoading } = useQuery({
-    queryKey: ['workflow_runs'],
+    queryKey: ['workflow_runs_with_orders'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('workflow_runs')
-        .select('*')
+        .select(`
+          *,
+          orders (
+            system_order_id,
+            external_order_id,
+            status,
+            created_at
+          )
+        `)
         .order('started_at', { ascending: false })
         .limit(10);
       
       if (error) throw error;
       return data;
-    }
+    },
+    refetchInterval: 3000, // Actualización en tiempo real cada 3 segundos
   });
 
   const saveWorkflowMutation = useMutation({
@@ -267,25 +276,67 @@ const Workflows = () => {
               ) : workflowRuns && workflowRuns.length > 0 ? (
                 <div className="space-y-4">
                   {workflowRuns.map((run) => (
-                    <div key={run.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex-1">
-                        <p className="font-medium">Run #{run.id.slice(-8)}</p>
-                        <p className="text-sm text-muted-foreground">
-                          State: {run.current_state}
-                        </p>
+                    <div key={run.id} className="p-4 border rounded-lg bg-card">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-semibold text-foreground">
+                              Order: {run.orders?.system_order_id || 'No Order'}
+                            </p>
+                            <Badge 
+                              variant={
+                                run.status === 'completed' ? 'default' : 
+                                run.status === 'failed' ? 'destructive' : 
+                                run.status === 'paused' ? 'outline' :
+                                'secondary'
+                              }
+                            >
+                              {run.status}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-1">
+                            Current State: <span className="font-medium text-foreground">{run.current_state}</span>
+                          </p>
+                          <p className="text-sm text-muted-foreground mb-1">
+                            Order Status: <span className="font-medium">{run.orders?.status || 'Unknown'}</span>
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Started: {new Date(run.started_at).toLocaleString()}
+                          </p>
+                          {run.completed_at && (
+                            <p className="text-xs text-muted-foreground">
+                              Completed: {new Date(run.completed_at).toLocaleString()}
+                            </p>
+                          )}
+                          {run.error_message && (
+                            <p className="text-xs text-destructive mt-1">
+                              Error: {run.error_message}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Run ID</p>
+                          <p className="text-xs font-mono">#{run.id.slice(-8)}</p>
+                        </div>
+                      </div>
+                      
+                      {/* Live Status Indicator */}
+                      <div className="flex items-center gap-2 pt-2 border-t">
+                        <div className={`w-2 h-2 rounded-full ${
+                          run.status === 'running' ? 'bg-green-500 animate-pulse' :
+                          run.status === 'paused' ? 'bg-yellow-500' :
+                          run.status === 'completed' ? 'bg-blue-500' :
+                          run.status === 'failed' ? 'bg-red-500' :
+                          'bg-gray-400'
+                        }`}></div>
                         <p className="text-xs text-muted-foreground">
-                          {new Date(run.started_at).toLocaleString()}
+                          {run.status === 'running' ? 'Workflow is actively running' :
+                           run.status === 'paused' ? 'Workflow paused - waiting for action' :
+                           run.status === 'completed' ? 'Workflow completed successfully' :
+                           run.status === 'failed' ? 'Workflow failed - check error message' :
+                           'Unknown status'}
                         </p>
                       </div>
-                      <Badge 
-                        variant={
-                          run.status === 'completed' ? 'default' : 
-                          run.status === 'failed' ? 'destructive' : 
-                          'secondary'
-                        }
-                      >
-                        {run.status}
-                      </Badge>
                     </div>
                   ))}
                 </div>
