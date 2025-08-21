@@ -10,8 +10,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "./StatusBadge";
 import { OrderDetailModal } from "@/components/orders/OrderDetailModal";
-import { Search, Plus, Filter, Eye } from "lucide-react";
+import { Search, Plus, Filter, Eye, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 type OrderRow = {
   id: string;
@@ -57,6 +68,19 @@ async function createDemoOrder() {
   return data;
 }
 
+async function deleteOrderComplete(orderId: string) {
+  const { data, error } = await supabase.functions.invoke('delete_order_complete', {
+    body: { orderId }
+  });
+  
+  if (error) {
+    console.error("delete_order_complete failed:", error);
+    throw new Error(`Delete failed: ${error.message}`);
+  }
+  
+  return data;
+}
+
 export const OrdersTable = () => {
   console.log("OrdersTable rendering");
   
@@ -64,6 +88,7 @@ export const OrdersTable = () => {
   useRealtimeOrders();
   
   const qc = useQueryClient();
+  const { toast } = useToast();
   const { data: orders = [], isLoading, error } = useQuery({ 
     queryKey: ["orders"], 
     queryFn: fetchOrders,
@@ -73,6 +98,7 @@ export const OrdersTable = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
 
   const createMut = useMutation({ 
     mutationFn: createDemoOrder, 
@@ -81,6 +107,28 @@ export const OrdersTable = () => {
       qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
     },
     onError: (error) => console.error("Create order error:", error)
+  });
+
+  const deleteMut = useMutation({ 
+    mutationFn: deleteOrderComplete, 
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast({
+        title: "Order deleted",
+        description: "Order and all related data have been successfully deleted.",
+      });
+      setOrderToDelete(null);
+    },
+    onError: (error) => {
+      console.error("Delete order error:", error);
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      setOrderToDelete(null);
+    }
   });
 
   console.log("Orders data:", orders, "Loading:", isLoading, "Error:", error);
@@ -177,6 +225,15 @@ export const OrdersTable = () => {
                             <Eye className="w-3 h-3 mr-1" />
                             View
                           </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setOrderToDelete(o.id)}
+                            className="h-8 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            Delete
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -194,6 +251,35 @@ export const OrdersTable = () => {
         isOpen={!!selectedOrderId}
         onClose={() => setSelectedOrderId(null)}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!orderToDelete} onOpenChange={() => setOrderToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this order? This will permanently remove the order and ALL related data including:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>All conversations</li>
+                <li>All messages (inbox and outbox)</li>
+                <li>All workflow runs</li>
+                <li>All related timers and events</li>
+              </ul>
+              <strong className="text-destructive">This action cannot be undone.</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => orderToDelete && deleteMut.mutate(orderToDelete)}
+              disabled={deleteMut.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleteMut.isPending ? "Deleting..." : "Delete Order"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
