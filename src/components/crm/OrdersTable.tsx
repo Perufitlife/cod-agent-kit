@@ -32,13 +32,8 @@ async function fetchOrders(): Promise<OrderRow[]> {
 }
 
 async function createDemoOrder() {
-  const res = await fetch("https://ghsxvotykfhnfqyymdvh.supabase.co/functions/v1/create_order", {
-    method: "POST",
-    headers: { 
-      "content-type": "application/json",
-      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdoc3h2b3R5a2ZobmZxeXltZHZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3MzY1MjgsImV4cCI6MjA3MTMxMjUyOH0.NcFJ51O2Sssw-Y3aX1OKk9oWV7aVN69qUVLlAClaB-Q"
-    },
-    body: JSON.stringify({
+  const { data, error } = await supabase.functions.invoke('create_order', {
+    body: {
       source: "manual",
       data: {
         name: "Demo Customer",
@@ -49,14 +44,15 @@ async function createDemoOrder() {
         customer_phone: "+1234567890",
         products: [{ product_name: "Gadget", quantity: 1, unit_price: 49.9 }],
       },
-    }),
+    }
   });
-  if (!res.ok) {
-    const errorText = await res.text();
-    console.error("create_order failed:", errorText);
-    throw new Error(`create_order failed: ${errorText}`);
+  
+  if (error) {
+    console.error("create_order failed:", error);
+    throw new Error(`create_order failed: ${error.message}`);
   }
-  return res.json();
+  
+  return data;
 }
 
 export const OrdersTable = () => {

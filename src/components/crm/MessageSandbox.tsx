@@ -73,19 +73,20 @@ export const MessageSandbox = () => {
 
   const sendMut = useMutation({
     mutationFn: async () => {
-      const res = await fetch("https://ghsxvotykfhnfqyymdvh.supabase.co/functions/v1/sandbox_message", {
-        method: "POST",
-        headers: { 
-          "content-type": "application/json",
-          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdoc3h2b3R5a2ZobmZxeXltZHZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3MzY1MjgsImV4cCI6MjA3MTMxMjUyOH0.NcFJ51O2Sssw-Y3aX1OKk9oWV7aVN69qUVLlAClaB-Q"
-        },
-        body: JSON.stringify({ customer_phone: customerPhone, message_text: messageText, conversation_id: conversationId }),
+      const { data, error } = await supabase.functions.invoke('sandbox_message', {
+        body: { 
+          customer_phone: customerPhone, 
+          message_text: messageText, 
+          conversation_id: conversationId 
+        }
       });
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error("sandbox_message failed:", errorText);
-        throw new Error(`sandbox_message failed: ${errorText}`);
+      
+      if (error) {
+        console.error("sandbox_message failed:", error);
+        throw new Error(`sandbox_message failed: ${error.message}`);
       }
+      
+      return data;
     },
     onSuccess: () => {
       setMessageText("");
